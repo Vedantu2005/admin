@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Mic, Youtube, User, CalendarDays, ExternalLink, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Mic,  User, CalendarDays, X } from 'lucide-react';
 
 interface Podcast {
   id: string;

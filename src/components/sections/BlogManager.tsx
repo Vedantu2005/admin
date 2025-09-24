@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Image, Calendar, User, ArrowLeft, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Calendar, X } from 'lucide-react';
 import JoditEditor from 'jodit-react';
 
 interface Blog {
