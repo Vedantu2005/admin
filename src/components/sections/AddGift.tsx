@@ -1,0 +1,216 @@
+import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
+import { GiftProduct } from '../Dashboard';
+
+interface AddGiftProps {
+    onSaveProduct: (productData: Omit<GiftProduct, 'id' | 'status'>, id: number | null) => void;
+    productToEdit: GiftProduct | null;
+}
+
+interface ProductFaq {
+  id: number;
+  question: string;
+  answer: string;
+}
+
+const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
+    const initialFormState = {
+        productName: '',
+        category: '',
+        mrp: 0,
+        contents: '',
+    };
+
+    const [formState, setFormState] = useState(initialFormState);
+    const [mainImage, setMainImage] = useState<File | null>(null);
+    const [faqs, setFaqs] = useState<ProductFaq[]>([
+        { id: Date.now() + 1, question: 'Is gift wrapping available?', answer: 'Yes, all our gift products come with premium gift wrapping.' },
+        { id: Date.now() + 2, question: 'Can I add a custom message?', answer: 'Yes, you can add a custom message at the checkout page.'}
+    ]);
+    
+    const [isFaqModalOpen, setIsFaqModalOpen] = useState(false);
+    const [newFaq, setNewFaq] = useState<Omit<ProductFaq, 'id'>>({ question: '', answer: '' });
+    const [openFaqId, setOpenFaqId] = useState<number | null>(null);
+    const [editingFaqId, setEditingFaqId] = useState<number | null>(null);
+
+    const mainImageInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (productToEdit) {
+            setFormState({
+                productName: productToEdit.category,
+                category: productToEdit.category,
+                mrp: productToEdit.mrp,
+                contents: productToEdit.contents,
+            });
+        } else {
+            handleReset();
+        }
+    }, [productToEdit]);
+
+    const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { id, value } = e.target;
+        setFormState(prev => ({...prev, [id]: id === 'mrp' ? parseFloat(value) || 0 : value }));
+    };
+    
+    const handleReset = () => {
+        setFormState(initialFormState);
+        setMainImage(null);
+        setFaqs([
+            { id: Date.now() + 1, question: 'Is gift wrapping available?', answer: 'Yes, all our gift products come with premium gift wrapping.' },
+            { id: Date.now() + 2, question: 'Can I add a custom message?', answer: 'Yes, you can add a custom message at the checkout page.'}
+        ]);
+        if (mainImageInputRef.current) mainImageInputRef.current.value = '';
+    };
+    
+    const handleSave = () => {
+        if (!formState.productName || !formState.category || formState.mrp <= 0) {
+            alert('Please fill out Product Name, Category, and MRP.');
+            return;
+        }
+        const productData = {
+            image: mainImage ? URL.createObjectURL(mainImage) : productToEdit?.image || 'https://via.placeholder.com/40',
+            category: formState.productName,
+            mrp: formState.mrp,
+            contents: formState.contents,
+        };
+        onSaveProduct(productData, productToEdit ? productToEdit.id : null);
+        alert(productToEdit ? 'Gifting Product updated!' : 'Gifting Product added!');
+    };
+
+    const handleMainImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) setMainImage(file);
+    };
+
+    const handleNewFaqChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setNewFaq(prev => ({ ...prev, [name]: value }));
+    };
+    const handleSaveFaq = () => {
+        if (!newFaq.question || !newFaq.answer) {
+            alert('Please provide both a question and an answer.'); return;
+        }
+        if (editingFaqId) {
+            setFaqs(prev => prev.map(f => f.id === editingFaqId ? { ...newFaq, id: editingFaqId } : f));
+        } else {
+            setFaqs(prev => [...prev, { ...newFaq, id: Date.now() }]);
+        }
+        closeFaqModal();
+    };
+    const handleEditFaq = (faq: ProductFaq) => {
+        setEditingFaqId(faq.id); setNewFaq({ question: faq.question, answer: faq.answer }); setIsFaqModalOpen(true);
+    };
+    const handleDeleteFaq = (id: number) => {
+        if (window.confirm('Are you sure?')) setFaqs(prev => prev.filter(f => f.id !== id));
+    };
+    const toggleFaq = (id: number) => {
+        setOpenFaqId(prevId => (prevId === id ? null : id));
+    };
+    const openFaqModal = () => setIsFaqModalOpen(true);
+    const closeFaqModal = () => {
+        setIsFaqModalOpen(false); setEditingFaqId(null); setNewFaq({ question: '', answer: '' });
+    };
+  
+    return (
+    <div className="bg-gray-50 p-6 sm:p-0 font-sans">
+      <div className="space-y-6">
+        
+        <div className="bg-white p-6 rounded-lg shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">{productToEdit ? 'Edit Gifting Product' : 'Add Gifting Product'}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="productName" className="block text-sm font-medium text-gray-600 mb-1">Gifting Product Name</label>
+              <input type="text" id="productName" value={formState.productName} onChange={handleFormChange} placeholder="e.g., Diwali Hamper" className="w-full p-2 border border-[#703102] rounded-md focus:ring-2 focus:ring-[#703102]/50 focus:border-[#703102]" />
+            </div>
+            <div>
+              <label htmlFor="category" className="block text-sm font-medium text-gray-600 mb-1">Category</label>
+              <select id="category" value={formState.category} onChange={handleFormChange} className="w-full p-2 border border-[#703102] rounded-md focus:ring-2 focus:ring-[#703102]/50 focus:border-[#703102]">
+                <option value="">Select a category</option>
+                <option value="Festival Gifts">Festival Gifts</option>
+                <option value="Corporate Gifts">Corporate Gifts</option>
+                <option value="Wellness Box">Wellness Box</option>
+              </select>
+            </div>
+             <div className="md:col-span-1">
+              <label htmlFor="mrp" className="block text-sm font-medium text-gray-600 mb-1">MRP*</label>
+              <input type="number" id="mrp" value={formState.mrp > 0 ? formState.mrp : ''} onChange={handleFormChange} placeholder="e.g., 999" className="w-full p-2 border border-[#703102] rounded-md focus:ring-2 focus:ring-[#703102]/50 focus:border-[#703102]" />
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="contents" className="block text-sm font-medium text-gray-600 mb-1">Contents</label>
+              <textarea id="contents" value={formState.contents} onChange={handleFormChange} rows={3} placeholder="List items included in the gift pack" className="w-full p-2 border border-[#703102] rounded-md focus:ring-2 focus:ring-[#703102]/50 focus:border-[#703102]"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">Upload Product Image</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Main Image</label>
+              <input type="file" ref={mainImageInputRef} onChange={handleMainImageChange} className="hidden" accept="image/*" />
+              <div onClick={() => mainImageInputRef.current?.click()} className="relative group border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center cursor-pointer hover:border-[#703102] transition-colors">
+                {mainImage ? <img src={URL.createObjectURL(mainImage)} alt="Main preview" className="max-h-full max-w-full object-contain" /> : <p className="text-gray-400 text-center">Click to upload main image</p>}
+                {mainImage && <button onClick={(e) => { e.stopPropagation(); setMainImage(null); }} className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove main image">✕</button>}
+              </div>
+            </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow-sm">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Product Faqs</h2>
+          <div className="space-y-2 mb-6">
+            {faqs.map(faq => (
+              <div key={faq.id} className="relative group border-b border-gray-200 py-2">
+                <button onClick={() => toggleFaq(faq.id)} className="w-full flex justify-between items-center text-left text-gray-800">
+                  <span className="font-semibold pr-16">{faq.question}</span>
+                  <div className="flex items-center absolute right-0 top-1/2 -translate-y-1/2">
+                    <div className="flex items-center space-x-2 mr-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <button onClick={(e) => { e.stopPropagation(); handleEditFaq(faq); }} className="p-1.5 bg-gray-100 rounded-full hover:bg-amber-100 text-gray-600 hover:text-amber-600" aria-label="Edit FAQ"><Pencil size={12} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteFaq(faq.id); }} className="p-1.5 bg-gray-100 rounded-full hover:bg-red-100 text-gray-600 hover:text-red-600" aria-label="Delete FAQ"><Trash2 size={12} /></button>
+                    </div>
+                    <span className="text-xl font-light">{openFaqId === faq.id ? '-' : '+'}</span>
+                  </div>
+                </button>
+                {openFaqId === faq.id && (<div className="mt-2 pl-2 text-gray-600 text-sm">{faq.answer}</div>)}
+              </div>
+            ))}
+          </div>
+          <button onClick={openFaqModal} className="px-6 py-2 text-white font-semibold rounded-md transition" style={{ backgroundColor: '#703102' }}>ADD MORE</button>
+        </div>
+        
+        <div className="flex justify-start space-x-4 mt-6">
+            <button onClick={handleSave} className="px-6 py-2 text-white font-semibold rounded-md transition" style={{ backgroundColor: '#703102' }}>
+                {productToEdit ? 'UPDATE GIFT PRODUCT' : 'ADD GIFT PRODUCT'}
+            </button>
+            <button type="button" onClick={handleReset} className="px-6 py-2 text-white font-semibold rounded-md transition" style={{ backgroundColor: '#703102' }}>
+                RESET
+            </button>
+        </div>
+
+        {isFaqModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-lg relative">
+              <button onClick={closeFaqModal} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800">✕</button>
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">{editingFaqId ? 'Edit Faq' : 'Add Faq'}</h2>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="faq-question" className="block text-md font-semibold text-gray-700 mb-2">Question</label>
+                  <textarea id="faq-question" name="question" value={newFaq.question} onChange={handleNewFaqChange} placeholder="text area" rows={3} className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50" />
+                </div>
+                <div>
+                  <label htmlFor="faq-answer" className="block text-md font-semibold text-gray-700 mb-2">Answer</label>
+                  <textarea id="faq-answer" name="answer" value={newFaq.answer} onChange={handleNewFaqChange} placeholder="text area" rows={5} className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50" />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-4 mt-6">
+                <button onClick={closeFaqModal} className="px-6 py-2 bg-gray-300 text-gray-800 font-semibold rounded-md">Cancel</button>
+                <button onClick={handleSaveFaq} className="px-6 py-2 text-white font-semibold rounded-md" style={{ backgroundColor: '#703102' }}>{editingFaqId ? 'Update Faq' : 'Add Faq'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AddGift;

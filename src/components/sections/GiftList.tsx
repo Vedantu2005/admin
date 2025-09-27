@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
-import { ComboProduct } from '../Dashboard'; // Import the ComboProduct type
+import { GiftProduct } from '../Dashboard';
 
-// Define props interface
-interface ComboProductListProps {
-  products: ComboProduct[];
+interface GiftListProps {
+  products: GiftProduct[];
   onDeleteProduct: (id: number) => void;
   onNavigateToAddProduct: () => void;
-  onEditProduct: (product: ComboProduct) => void;
+  onEditProduct: (product: GiftProduct) => void;
 }
 
-const ComboProductList: React.FC<ComboProductListProps> = ({ products, onDeleteProduct, onNavigateToAddProduct, onEditProduct }) => {
+const GiftList: React.FC<GiftListProps> = ({ products, onDeleteProduct, onNavigateToAddProduct, onEditProduct }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [entriesToShow, setEntriesToShow] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
@@ -23,20 +22,16 @@ const ComboProductList: React.FC<ComboProductListProps> = ({ products, onDeleteP
   const currentEntries = filteredProducts.slice(indexOfFirstEntry, indexOfLastEntry);
   const totalPages = Math.ceil(filteredProducts.length / entriesToShow);
 
-  const calculateDiscount = (actual: number, selling: number) => {
-    return actual > 0 ? Math.round(((actual - selling) / actual) * 100) : 0;
-  };
-
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm font-sans">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Combo Product List</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Gifting Product List</h1>
         <button 
           onClick={onNavigateToAddProduct} 
           className="px-4 py-2 text-white font-semibold rounded-md transition" 
           style={{ backgroundColor: '#703102' }}
         >
-          ADD COMBO PRODUCT
+          ADD GIFTING PRODUCT
         </button>
       </div>
 
@@ -72,11 +67,9 @@ const ComboProductList: React.FC<ComboProductListProps> = ({ products, onDeleteP
             <tr>
               <th className="p-3">S No.</th>
               <th className="p-3">Image</th>
-              <th className="p-3">Combo Name</th>
-              <th className="p-3">Actual MRP</th>
-              <th className="p-3">Selling MRP</th>
-              <th className="p-3">Discount (in%)</th>
-              {/* <th className="p-3">No. of variants</th> */}
+              <th className="p-3">Category</th>
+              <th className="p-3">MRP</th>
+              <th className="p-3">Contents</th>
               <th className="p-3">Status</th>
               <th className="p-3">Action</th>
             </tr>
@@ -87,10 +80,8 @@ const ComboProductList: React.FC<ComboProductListProps> = ({ products, onDeleteP
                 <td className="p-3">{indexOfFirstEntry + index + 1}</td>
                 <td className="p-3"><img src={product.image} alt={product.category} className="w-10 h-10 rounded-md object-cover" /></td>
                 <td className="p-3 font-medium">{product.category}</td>
-                <td className="p-3">₹{product.actualMRP}</td>
-                <td className="p-3">₹{product.sellingMRP}</td>
-                <td className="p-3">{calculateDiscount(product.actualMRP, product.sellingMRP)}%</td>
-                {/* <td className="p-3">{product.variants}</td> */}
+                <td className="p-3">₹{product.mrp}</td>
+                <td className="p-3 text-gray-600">{product.contents}</td>
                 <td className="p-3">
                   <span className={`px-2 py-1 rounded-full text-xs ${product.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                     {product.status}
@@ -128,4 +119,4 @@ const ComboProductList: React.FC<ComboProductListProps> = ({ products, onDeleteP
   );
 };
 
-export default ComboProductList;
+export default GiftList;

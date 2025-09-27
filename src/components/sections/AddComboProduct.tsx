@@ -294,7 +294,7 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
         </div>
         
         {/* Section 4: Variant */}
-        <div className="bg-white p-6 rounded-lg shadow-sm">
+        {/* <div className="bg-white p-6 rounded-lg shadow-sm">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Variant</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {variants.map(variant => (
@@ -318,7 +318,7 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
             ))}
           </div>
           <button onClick={openVariantModal} className="px-6 py-2 text-white font-semibold rounded-md transition" style={{ backgroundColor: '#703102' }}>ADD MORE</button>
-        </div>
+        </div> */}
 
         {/* Section 5: Product Info */}
         <div className="bg-white p-6 rounded-lg shadow-sm">
