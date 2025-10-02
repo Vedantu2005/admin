@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
+import { ProductService, ComboProductService, GiftProductService } from '../firebase/productService';
 
 // Import your actual components
 import BlogManager from './sections/BlogManager';
@@ -17,27 +18,58 @@ import GiftList from './sections/GiftList';
 import BestSeller from './sections/BestSeller';
 import ProductOfTheDay from './sections/ProductOfTheDay';
 
-// --- Placeholder Components ---
-const Placeholder = ({ title }: { title: string }) => (
-  <div className="bg-white p-6 rounded-lg shadow-md">
-    <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
-    <p className="text-gray-600 mt-2">This is a placeholder for the {title} section.</p>
-  </div>
-);
-
 // --- Product Data and Type Definitions ---
-export interface Product {
+export interface ProductVariant {
   id: number;
-  image: string;
-  category: string;
+  bottleSize: string;
   actualMRP: number;
   sellingMRP: number;
-  variants: number;
-  status: 'Active' | 'Inactive';
+  discount: number;
+  pricePerLiter: number;
 }
+
+export interface ProductFaq {
+  id: number;
+  question: string;
+  answer: string;
+}
+
+export interface Product {
+  id: number;
+  firestoreId?: string; // Add Firestore ID for operations
+  
+  // Basic product info
+  productName: string;
+  category: string;
+  shortDescription: string;
+  rating: string;
+  longDescription: string;
+  
+  // Pricing (legacy compatibility)
+  actualMRP: number;
+  sellingMRP: number;
+  variants: number; // Count of variants
+  status: 'Active' | 'Inactive';
+  
+  // Images
+  image?: string; // For backward compatibility
+  mainImage?: string;
+  otherImages?: string[];
+  
+  // Product info
+  ingredients?: string;
+  benefits?: string;
+  storageInfo?: string;
+  
+  // Variants and FAQs
+  productVariants?: ProductVariant[];
+  productFaqs?: ProductFaq[];
+}
+
 export type ComboProduct = Product;
 export interface GiftProduct {
     id: number;
+    firestoreId?: string; // Add Firestore ID for operations
     image: string;
     category: string;
     mrp: number;
@@ -45,105 +77,227 @@ export interface GiftProduct {
     status: 'Active' | 'Inactive';
 }
 
-const initialProducts: Product[] = [
-    { id: 1, image: 'https://media.istockphoto.com/id/1303121545/photo/cold-pressed-groundnut-oil.jpg?s=612x612&w=0&k=20&c=n-3-22-p4joJ_v4j222aG212-l-6FH6_V_24_q1fSg=', category: 'Groundnut Oil', actualMRP: 140, sellingMRP: 120, variants: 3, status: 'Active' },
-    { id: 2, image: 'https://media.istockphoto.com/id/1329237936/photo/mustard-oil-in-a-glass-jar-and-seeds-in-a-wooden-bowl-on-a-jute-background.jpg?s=612x612&w=0&k=20&c=6I6sVwG30_B_b-tS_01c-vVd2XbnsJ4F2jH_x-jRPTs=', category: 'Mustard Oil', actualMRP: 180, sellingMRP: 165, variants: 2, status: 'Active' },
-    { id: 3, image: 'https://media.istockphoto.com/id/1392811123/photo/bottle-of-safflower-oil-and-safflower-flower-on-the-table.jpg?s=612x612&w=0&k=20&c=_I4GzY45F-Q30u2oU5b2x7L-T-I8v1Y4-qD2k1h-tB8=', category: 'Safflower Oil', actualMRP: 220, sellingMRP: 200, variants: 4, status: 'Inactive' },
-];
-const initialComboProducts: ComboProduct[] = [
-    { id: 1, image: 'https://via.placeholder.com/150/FFC0CB/000000?Text=Combo1', category: 'Healthy Oils Combo', actualMRP: 420, sellingMRP: 360, variants: 1, status: 'Active' },
-    { id: 2, image: 'https://via.placeholder.com/150/ADD8E6/000000?Text=Combo2', category: 'Cooking Essentials Pack', actualMRP: 830, sellingMRP: 780, variants: 1, status: 'Active' },
-];
-const initialGiftProducts: GiftProduct[] = [
-    { id: 1, image: 'https://via.placeholder.com/150/fab1a0/000000?Text=GiftBox1', category: 'Diwali Gift Hamper', mrp: 999, contents: 'Assorted Oils, Diyas, Sweets', status: 'Active' },
-    { id: 2, image: 'https://via.placeholder.com/150/74b9ff/000000?Text=GiftBox2', category: 'Corporate Wellness Box', mrp: 1499, contents: 'Premium Oil Set, Dry Fruits', status: 'Inactive' },
-];
-
 interface DashboardProps {
   onLogout: () => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [activeSection, setActiveSection] = useState('blog');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // State for Regular Products
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   
   // State for Combo Products
-  const [comboProducts, setComboProducts] = useState<ComboProduct[]>(initialComboProducts);
+  const [comboProducts, setComboProducts] = useState<ComboProduct[]>([]);
   const [comboProductToEdit, setComboProductToEdit] = useState<ComboProduct | null>(null);
 
   // State for Gifting Products
-  const [giftProducts, setGiftProducts] = useState<GiftProduct[]>(initialGiftProducts);
+  const [giftProducts, setGiftProducts] = useState<GiftProduct[]>([]);
   const [giftProductToEdit, setGiftProductToEdit] = useState<GiftProduct | null>(null);
 
-  // --- Handlers for Regular Products ---
-  const handleSaveProduct = (productData: Omit<Product, 'id' | 'status'>, id: number | null) => {
-    if (id) {
-      setProducts(prev => prev.map(p => p.id === id ? { ...p, ...productData, id } : p));
-    } else {
-      const newProduct: Product = { ...productData, id: Date.now(), status: 'Active' };
-      setProducts(prev => [newProduct, ...prev]);
+  // Load data from Firestore on component mount
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
+  const loadAllData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [productsData, comboProductsData, giftProductsData] = await Promise.all([
+        ProductService.getAllProducts(),
+        ComboProductService.getAllComboProducts(),
+        GiftProductService.getAllGiftProducts()
+      ]);
+      
+      setProducts(productsData);
+      setComboProducts(comboProductsData);
+      setGiftProducts(giftProductsData);
+    } catch (err) {
+      setError('Failed to load data from database');
+      console.error('Error loading data:', err);
+    } finally {
+      setLoading(false);
     }
-    setProductToEdit(null);
-    setActiveSection('product-list');
   };
-  const handleDeleteProduct = (id: number) => {
-    if (window.confirm('Are you sure?')) setProducts(prev => prev.filter(p => p.id !== id));
+
+  // --- Handlers for Regular Products ---
+  const handleSaveProduct = async (productData: Omit<Product, 'id' | 'status' | 'firestoreId'>, id: number | null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (id && productToEdit?.firestoreId) {
+        // Update existing product
+        await ProductService.updateProduct(productToEdit.firestoreId, productData);
+        setProducts(prev => prev.map(p => 
+          p.id === id ? { ...p, ...productData, id } : p
+        ));
+      } else {
+        // Add new product
+        const firestoreId = await ProductService.addProduct({ ...productData, status: 'Active' });
+        const newProduct: Product = { 
+          ...productData, 
+          id: Date.now(), 
+          status: 'Active',
+          firestoreId 
+        };
+        setProducts(prev => [newProduct, ...prev]);
+      }
+      setProductToEdit(null);
+      setActiveSection('product-list');
+    } catch (err) {
+      setError('Failed to save product');
+      console.error('Error saving product:', err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleDeleteProduct = async (id: number) => {
+    if (window.confirm('Are you sure you want to delete this product?')) {
+      setLoading(true);
+      setError(null);
+      try {
+        const product = products.find(p => p.id === id);
+        if (product?.firestoreId) {
+          await ProductService.deleteProduct(product.firestoreId);
+          setProducts(prev => prev.filter(p => p.id !== id));
+        }
+      } catch (err) {
+        setError('Failed to delete product');
+        console.error('Error deleting product:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const handleEditProduct = (product: Product) => {
     setProductToEdit(product);
     setActiveSection('product-add');
   };
+
   const handleNavigateToAddProduct = () => {
     setProductToEdit(null);
     setActiveSection('product-add');
   };
 
   // --- Handlers for Combo Products ---
-  const handleSaveComboProduct = (productData: Omit<ComboProduct, 'id' | 'status'>, id: number | null) => {
-    if (id) {
-        setComboProducts(prev => prev.map(p => p.id === id ? { ...p, ...productData, id } : p));
-    } else {
-        const newProduct: ComboProduct = { ...productData, id: Date.now(), status: 'Active' };
+  const handleSaveComboProduct = async (productData: Omit<ComboProduct, 'id' | 'status' | 'firestoreId'>, id: number | null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (id && comboProductToEdit?.firestoreId) {
+        await ComboProductService.updateComboProduct(comboProductToEdit.firestoreId, productData);
+        setComboProducts(prev => prev.map(p => 
+          p.id === id ? { ...p, ...productData, id } : p
+        ));
+      } else {
+        const firestoreId = await ComboProductService.addComboProduct({ ...productData, status: 'Active' });
+        const newProduct: ComboProduct = { 
+          ...productData, 
+          id: Date.now(), 
+          status: 'Active',
+          firestoreId 
+        };
         setComboProducts(prev => [newProduct, ...prev]);
+      }
+      setComboProductToEdit(null);
+      setActiveSection('product-list-combo');
+    } catch (err) {
+      setError('Failed to save combo product');
+      console.error('Error saving combo product:', err);
+    } finally {
+      setLoading(false);
     }
-    setComboProductToEdit(null);
-    setActiveSection('product-list-combo');
   };
-  const handleDeleteComboProduct = (id: number) => {
-    if (window.confirm('Are you sure?')) setComboProducts(prev => prev.filter(p => p.id !== id));
+
+  const handleDeleteComboProduct = async (id: number) => {
+    if (window.confirm('Are you sure you want to delete this combo product?')) {
+      setLoading(true);
+      setError(null);
+      try {
+        const product = comboProducts.find(p => p.id === id);
+        if (product?.firestoreId) {
+          await ComboProductService.deleteComboProduct(product.firestoreId);
+          setComboProducts(prev => prev.filter(p => p.id !== id));
+        }
+      } catch (err) {
+        setError('Failed to delete combo product');
+        console.error('Error deleting combo product:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
   };
+
   const handleEditComboProduct = (product: ComboProduct) => {
     setComboProductToEdit(product);
     setActiveSection('product-add-combo');
   };
+
   const handleNavigateToAddComboProduct = () => {
     setComboProductToEdit(null);
     setActiveSection('product-add-combo');
   };
   
   // --- Handlers for Gifting Products ---
-  const handleSaveGiftProduct = (productData: Omit<GiftProduct, 'id' | 'status'>, id: number | null) => {
-    if (id) {
-        setGiftProducts(prev => prev.map(p => p.id === id ? { ...p, ...productData, id } : p));
-    } else {
-        const newProduct: GiftProduct = { ...productData, id: Date.now(), status: 'Active' };
+  const handleSaveGiftProduct = async (productData: Omit<GiftProduct, 'id' | 'status' | 'firestoreId'>, id: number | null) => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (id && giftProductToEdit?.firestoreId) {
+        await GiftProductService.updateGiftProduct(giftProductToEdit.firestoreId, productData);
+        setGiftProducts(prev => prev.map(p => 
+          p.id === id ? { ...p, ...productData, id } : p
+        ));
+      } else {
+        const firestoreId = await GiftProductService.addGiftProduct({ ...productData, status: 'Active' });
+        const newProduct: GiftProduct = { 
+          ...productData, 
+          id: Date.now(), 
+          status: 'Active',
+          firestoreId 
+        };
         setGiftProducts(prev => [newProduct, ...prev]);
+      }
+      setGiftProductToEdit(null);
+      setActiveSection('product-list-gifting');
+    } catch (err) {
+      setError('Failed to save gift product');
+      console.error('Error saving gift product:', err);
+    } finally {
+      setLoading(false);
     }
-    setGiftProductToEdit(null);
-    setActiveSection('product-list-gifting');
   };
-  const handleDeleteGiftProduct = (id: number) => {
-    if (window.confirm('Are you sure?')) {
-        setGiftProducts(prev => prev.filter(p => p.id !== id));
+
+  const handleDeleteGiftProduct = async (id: number) => {
+    if (window.confirm('Are you sure you want to delete this gift product?')) {
+      setLoading(true);
+      setError(null);
+      try {
+        const product = giftProducts.find(p => p.id === id);
+        if (product?.firestoreId) {
+          await GiftProductService.deleteGiftProduct(product.firestoreId);
+          setGiftProducts(prev => prev.filter(p => p.id !== id));
+        }
+      } catch (err) {
+        setError('Failed to delete gift product');
+        console.error('Error deleting gift product:', err);
+      } finally {
+        setLoading(false);
+      }
     }
   };
+
   const handleEditGiftProduct = (product: GiftProduct) => {
     setGiftProductToEdit(product);
     setActiveSection('product-add-gifting');
   };
+
   const handleNavigateToAddGiftProduct = () => {
     setGiftProductToEdit(null);
     setActiveSection('product-add-gifting');
@@ -156,6 +310,33 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         ...comboProducts.map(p => ({ id: `combo-${p.id}`, name: p.category })),
         ...giftProducts.map(p => ({ id: `gift-${p.id}`, name: p.category }))
     ];
+
+    // Show loading or error states
+    if (loading) {
+      return (
+        <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-gray-600">Loading...</div>
+          </div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="bg-white p-6 rounded-lg shadow-sm">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-red-600">{error}</div>
+            <button 
+              onClick={loadAllData}
+              className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     switch (activeSection) {
       case 'blog': return <BlogManager />;

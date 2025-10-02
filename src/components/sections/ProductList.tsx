@@ -87,7 +87,13 @@ const ProductList: React.FC<ProductListProps> = ({ products, onDeleteProduct, on
             {currentEntries.map((product, index) => (
               <tr key={product.id} className="border-b hover:bg-gray-50">
                 <td className="p-3">{indexOfFirstEntry + index + 1}</td>
-                <td className="p-3"><img src={product.image} alt={product.category} className="w-10 h-10 rounded-md object-cover" /></td>
+                <td className="p-3">
+                  <img 
+                    src={product.mainImage || product.image || 'https://via.placeholder.com/40'} 
+                    alt={product.category} 
+                    className="w-10 h-10 rounded-md object-cover" 
+                  />
+                </td>
                 <td className="p-3 font-medium">{product.category}</td>
                 <td className="p-3">₹{product.actualMRP}</td>
                 <td className="p-3">₹{product.sellingMRP}</td>

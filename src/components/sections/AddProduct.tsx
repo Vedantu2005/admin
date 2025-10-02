@@ -1,26 +1,11 @@
 import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
-import { Product } from '../Dashboard'; // Ensure this path is correct
+import { Product, ProductVariant, ProductFaq } from '../Dashboard'; // Import from Dashboard
 
 // --- Define props interface ---
 interface AddProductProps {
-    onSaveProduct: (productData: Omit<Product, 'id' | 'status'>, id: number | null) => void;
+    onSaveProduct: (productData: Omit<Product, 'id' | 'status' | 'firestoreId'>, id: number | null) => void;
     productToEdit: Product | null;
-}
-
-// Define interfaces for local data structures
-interface ProductVariant {
-  id: number;
-  bottleSize: string;
-  actualMRP: number;
-  sellingMRP: number;
-  discount: number;
-  pricePerLiter: number;
-}
-interface ProductFaq {
-  id: number;
-  question: string;
-  answer: string;
 }
 
 const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit }) => {
@@ -69,14 +54,38 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
     useEffect(() => {
         if (productToEdit) {
             setFormState({
-                ...initialFormState,
-                productName: productToEdit.category, // Assuming 'category' from list is product name
-                category: productToEdit.category,
-                actualMRP: productToEdit.actualMRP,
-                sellingMRP: productToEdit.sellingMRP,
+                productName: productToEdit.productName || productToEdit.category || '',
+                category: productToEdit.category || '',
+                shortDescription: productToEdit.shortDescription || '',
+                rating: productToEdit.rating || '',
+                longDescription: productToEdit.longDescription || '',
+                actualMRP: productToEdit.actualMRP || 0,
+                sellingMRP: productToEdit.sellingMRP || 0,
+                discount: 0, // Will be calculated
+                ingredients: productToEdit.ingredients || '',
+                benefits: productToEdit.benefits || '',
+                storageInfo: productToEdit.storageInfo || ''
             });
-            // In a real app, you would fetch the full product details including variants and FAQs here.
-            // For this example, variants and FAQs will start with the default for an edited product.
+            
+            // Load existing variants or use defaults
+            if (productToEdit.productVariants && productToEdit.productVariants.length > 0) {
+                setVariants(productToEdit.productVariants);
+            } else {
+                setVariants([
+                    { id: Date.now() + 1, bottleSize: '500 ml bottle', actualMRP: 280, sellingMRP: 240, discount: 14, pricePerLiter: 480 },
+                    { id: Date.now() + 2, bottleSize: '1 L bottle', actualMRP: 550, sellingMRP: 480, discount: 12, pricePerLiter: 480 },
+                ]);
+            }
+            
+            // Load existing FAQs or use defaults
+            if (productToEdit.productFaqs && productToEdit.productFaqs.length > 0) {
+                setFaqs(productToEdit.productFaqs);
+            } else {
+                setFaqs([
+                    { id: Date.now() + 3, question: 'What is the shelf life of the oil?', answer: 'The shelf life is approximately 12 months from the date of manufacturing. Please store it in a cool, dry place away from direct sunlight.' },
+                    { id: Date.now() + 4, question: 'Is this oil cold-pressed?', answer: 'Yes, our oil is 100% cold-pressed, ensuring that all the natural nutrients and flavors are retained.'}
+                ]);
+            }
         } else {
             handleReset();
         }
@@ -110,12 +119,35 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
             return;
         }
 
-        const productData = {
-            image: mainImage ? URL.createObjectURL(mainImage) : productToEdit?.image || 'https://via.placeholder.com/40',
-            category: formState.productName,
+        // Prepare image URLs (in a real app, you'd upload to storage and get URLs)
+        const mainImageUrl = mainImage ? URL.createObjectURL(mainImage) : productToEdit?.mainImage || '';
+        const otherImageUrls = otherImages.map(file => URL.createObjectURL(file));
+
+        const productData: Omit<Product, 'id' | 'status' | 'firestoreId'> = {
+            // Basic product info
+            productName: formState.productName,
+            category: formState.category,
+            shortDescription: formState.shortDescription,
+            rating: formState.rating,
+            longDescription: formState.longDescription,
+            
+            // Pricing (for backward compatibility)
             actualMRP: Number(formState.actualMRP),
             sellingMRP: Number(formState.sellingMRP),
-            variants: variants.length
+            variants: variants.length,
+            
+            // Images
+            mainImage: mainImageUrl,
+            otherImages: [...(productToEdit?.otherImages || []), ...otherImageUrls],
+            
+            // Product info
+            ingredients: formState.ingredients,
+            benefits: formState.benefits,
+            storageInfo: formState.storageInfo,
+            
+            // Variants and FAQs
+            productVariants: variants,
+            productFaqs: faqs
         };
         
         onSaveProduct(productData, productToEdit ? productToEdit.id : null);
