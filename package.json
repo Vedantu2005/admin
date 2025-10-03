@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "cloudinary": "^2.7.0",
+    "cloudinary-core": "^2.14.0",
+    "cloudinary-react": "^1.8.1",
     "firebase": "^12.3.0",
     "jodit-react": "^5.2.25",
     "lucide-react": "^0.344.0",

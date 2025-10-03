@@ -45,6 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
     { id: 'bulk-order', label: 'Bulk Order', icon: ShoppingCart },
     { id: 'contact', label: 'Contact', icon: MessageCircle },
     { id: 'faq', label: 'FAQ', icon: HelpCircle },
+    { id: 'cloudinary-debug', label: '🔧 Cloudinary Debug', icon: HelpCircle },
   ];
 
   const productSubItems = [

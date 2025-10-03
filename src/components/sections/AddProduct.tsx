@@ -1,6 +1,11 @@
-import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
+import React, { useState, useRef, ChangeEvent, useEffect, useCallback, useMemo } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Product, ProductVariant, ProductFaq } from '../Dashboard'; // Import from Dashboard
+import { 
+    uploadImageToCloudinary, 
+    uploadMultipleImagesToCloudinary, 
+    validateImageFile 
+} from '../../firebase/imageService';
 
 // --- Define props interface ---
 interface AddProductProps {
@@ -9,7 +14,7 @@ interface AddProductProps {
 }
 
 const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit }) => {
-    const initialFormState = {
+    const initialFormState = useMemo(() => ({
         productName: '',
         category: '',
         shortDescription: '',
@@ -21,12 +26,14 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
         ingredients: '',
         benefits: '',
         storageInfo: ''
-    };
+    }), []);
 
     // --- STATE MANAGEMENT ---
     const [formState, setFormState] = useState(initialFormState);
     const [mainImage, setMainImage] = useState<File | null>(null);
     const [otherImages, setOtherImages] = useState<File[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     
     // Default variants and FAQs are now set here
     const [variants, setVariants] = useState<ProductVariant[]>([
@@ -49,6 +56,28 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
 
     const mainImageInputRef = useRef<HTMLInputElement>(null);
     const otherImagesInputRef = useRef<HTMLInputElement>(null);
+
+    // --- FORM HANDLERS ---
+    const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { id, value } = e.target;
+        setFormState(prev => ({...prev, [id]: value}));
+    };
+    
+    const handleReset = useCallback(() => {
+        setFormState(initialFormState);
+        setMainImage(null);
+        setOtherImages([]);
+        setVariants([
+            { id: Date.now() + 1, bottleSize: '500 ml bottle', actualMRP: 280, sellingMRP: 240, discount: 14, pricePerLiter: 480 },
+            { id: Date.now() + 2, bottleSize: '1 L bottle', actualMRP: 550, sellingMRP: 480, discount: 12, pricePerLiter: 480 },
+        ]);
+        setFaqs([
+            { id: Date.now() + 3, question: 'What is the shelf life of the oil?', answer: 'The shelf life is approximately 12 months from the date of manufacturing.' },
+            { id: Date.now() + 4, question: 'Is this oil cold-pressed?', answer: 'Yes, our oil is 100% cold-pressed.'}
+        ]);
+        if (mainImageInputRef.current) mainImageInputRef.current.value = '';
+        if (otherImagesInputRef.current) otherImagesInputRef.current.value = '';
+    }, [initialFormState]);
 
     // Effect to populate form when in "Edit" mode
     useEffect(() => {
@@ -89,84 +118,139 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
         } else {
             handleReset();
         }
-    }, [productToEdit]);
-
-    // --- FORM HANDLERS ---
-    const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { id, value } = e.target;
-        setFormState(prev => ({...prev, [id]: value}));
-    };
+    }, [productToEdit, handleReset]);
     
-    const handleReset = () => {
-        setFormState(initialFormState);
-        setMainImage(null);
-        setOtherImages([]);
-        setVariants([
-            { id: Date.now() + 1, bottleSize: '500 ml bottle', actualMRP: 280, sellingMRP: 240, discount: 14, pricePerLiter: 480 },
-            { id: Date.now() + 2, bottleSize: '1 L bottle', actualMRP: 550, sellingMRP: 480, discount: 12, pricePerLiter: 480 },
-        ]);
-        setFaqs([
-            { id: Date.now() + 3, question: 'What is the shelf life of the oil?', answer: 'The shelf life is approximately 12 months from the date of manufacturing.' },
-            { id: Date.now() + 4, question: 'Is this oil cold-pressed?', answer: 'Yes, our oil is 100% cold-pressed.'}
-        ]);
-        if (mainImageInputRef.current) mainImageInputRef.current.value = '';
-        if (otherImagesInputRef.current) otherImagesInputRef.current.value = '';
-    };
-    
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formState.productName || !formState.category || formState.sellingMRP <= 0) {
             alert('Please fill out Product Name, Category, and Selling MRP.');
             return;
         }
 
-        // Prepare image URLs (in a real app, you'd upload to storage and get URLs)
-        const mainImageUrl = mainImage ? URL.createObjectURL(mainImage) : productToEdit?.mainImage || '';
-        const otherImageUrls = otherImages.map(file => URL.createObjectURL(file));
+        try {
+            setIsUploading(true);
+            setUploadProgress(0);
 
-        const productData: Omit<Product, 'id' | 'status' | 'firestoreId'> = {
-            // Basic product info
-            productName: formState.productName,
-            category: formState.category,
-            shortDescription: formState.shortDescription,
-            rating: formState.rating,
-            longDescription: formState.longDescription,
+            let mainImageUrl = productToEdit?.mainImage || '';
+            let otherImageUrls: string[] = productToEdit?.otherImages || [];
+
+            // Upload main image to Cloudinary if a new one is selected
+            if (mainImage) {
+                const validation = validateImageFile(mainImage);
+                if (!validation.isValid) {
+                    alert(validation.error);
+                    return;
+                }
+                
+                setUploadProgress(20);
+                mainImageUrl = await uploadImageToCloudinary(mainImage, 'dev-admin/products/main');
+                setUploadProgress(50);
+            }
+
+            // Upload other images to Cloudinary if new ones are selected
+            if (otherImages.length > 0) {
+                // Validate all other images
+                for (const file of otherImages) {
+                    const validation = validateImageFile(file);
+                    if (!validation.isValid) {
+                        alert(`Error with file ${file.name}: ${validation.error}`);
+                        return;
+                    }
+                }
+
+                const newOtherImageUrls = await uploadMultipleImagesToCloudinary(
+                    otherImages, 
+                    'dev-admin/products/gallery'
+                );
+                otherImageUrls = [...otherImageUrls, ...newOtherImageUrls];
+                setUploadProgress(90);
+            }
+
+            const productData: Omit<Product, 'id' | 'status' | 'firestoreId'> = {
+                // Basic product info
+                productName: formState.productName,
+                category: formState.category,
+                shortDescription: formState.shortDescription,
+                rating: formState.rating,
+                longDescription: formState.longDescription,
+                
+                // Pricing (for backward compatibility)
+                actualMRP: Number(formState.actualMRP),
+                sellingMRP: Number(formState.sellingMRP),
+                variants: variants.length,
+                
+                // Images - now using Cloudinary URLs
+                mainImage: mainImageUrl,
+                otherImages: otherImageUrls,
+                
+                // Product info
+                ingredients: formState.ingredients,
+                benefits: formState.benefits,
+                storageInfo: formState.storageInfo,
+                
+                // Variants and FAQs
+                productVariants: variants,
+                productFaqs: faqs
+            };
             
-            // Pricing (for backward compatibility)
-            actualMRP: Number(formState.actualMRP),
-            sellingMRP: Number(formState.sellingMRP),
-            variants: variants.length,
+            setUploadProgress(100);
+            onSaveProduct(productData, productToEdit ? productToEdit.id : null);
+            alert(productToEdit ? 'Product updated successfully!' : 'Product added successfully!');
             
-            // Images
-            mainImage: mainImageUrl,
-            otherImages: [...(productToEdit?.otherImages || []), ...otherImageUrls],
-            
-            // Product info
-            ingredients: formState.ingredients,
-            benefits: formState.benefits,
-            storageInfo: formState.storageInfo,
-            
-            // Variants and FAQs
-            productVariants: variants,
-            productFaqs: faqs
-        };
-        
-        onSaveProduct(productData, productToEdit ? productToEdit.id : null);
-        alert(productToEdit ? 'Product updated successfully!' : 'Product added successfully!');
+            // Reset form if it's a new product
+            if (!productToEdit) {
+                handleReset();
+            }
+        } catch (error) {
+            console.error('Error saving product:', error);
+            alert('Failed to save product. Please try again.');
+        } finally {
+            setIsUploading(false);
+            setUploadProgress(0);
+        }
     };
 
   // --- IMAGE HANDLERS ---
   const handleMainImageChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) setMainImage(file);
+    if (file) {
+      const validation = validateImageFile(file);
+      if (!validation.isValid) {
+        alert(validation.error);
+        if (event.target) event.target.value = '';
+        return;
+      }
+      setMainImage(file);
+    }
   };
+  
   const handleOtherImagesChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
       const newFiles = Array.from(files);
-      setOtherImages(prev => [...prev, ...newFiles].slice(0, 5));
+      
+      // Validate each file
+      for (const file of newFiles) {
+        const validation = validateImageFile(file);
+        if (!validation.isValid) {
+          alert(`Error with file ${file.name}: ${validation.error}`);
+          if (event.target) event.target.value = '';
+          return;
+        }
+      }
+      
+      // Check total count limit
+      const totalCount = otherImages.length + newFiles.length;
+      if (totalCount > 5) {
+        alert(`You can only upload up to 5 additional images. You're trying to add ${newFiles.length} files, but you already have ${otherImages.length}.`);
+        if (event.target) event.target.value = '';
+        return;
+      }
+      
+      setOtherImages(prev => [...prev, ...newFiles]);
       if (otherImagesInputRef.current) otherImagesInputRef.current.value = '';
     }
   };
+  
   const removeOtherImage = (indexToRemove: number) => {
     setOtherImages(prev => prev.filter((_, index) => index !== indexToRemove));
   };
@@ -432,13 +516,46 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
         
         {/* Footer Buttons */}
         <div className="flex justify-start space-x-4 mt-6">
-            <button onClick={handleSave} className="px-6 py-2 text-white font-semibold rounded-md transition" style={{ backgroundColor: '#703102' }}>
-                {productToEdit ? 'UPDATE PRODUCT' : 'ADD PRODUCT'}
+            <button 
+                onClick={handleSave} 
+                disabled={isUploading}
+                className="px-6 py-2 text-white font-semibold rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed" 
+                style={{ backgroundColor: '#703102' }}
+            >
+                {isUploading ? (
+                    <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                        <span>Uploading... {uploadProgress}%</span>
+                    </div>
+                ) : (
+                    productToEdit ? 'UPDATE PRODUCT' : 'ADD PRODUCT'
+                )}
             </button>
-            <button type="button" onClick={handleReset} className="px-6 py-2 text-white font-semibold rounded-md transition" style={{ backgroundColor: '#703102' }}>
+            <button 
+                type="button" 
+                onClick={handleReset} 
+                disabled={isUploading}
+                className="px-6 py-2 text-white font-semibold rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed" 
+                style={{ backgroundColor: '#703102' }}
+            >
                 RESET
             </button>
         </div>
+
+        {/* Upload Progress Bar */}
+        {isUploading && (
+            <div className="mt-4">
+                <div className="bg-gray-200 rounded-full h-2">
+                    <div 
+                        className="bg-[#703102] h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                </div>
+                <p className="text-sm text-gray-600 mt-2 text-center">
+                    Uploading images to Cloudinary... {uploadProgress}%
+                </p>
+            </div>
+        )}
 
         {/* Variant Modal */}
         {isVariantModalOpen && (
