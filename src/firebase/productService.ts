@@ -27,6 +27,26 @@ export interface Blog {
   detail: string;
 }
 
+// FAQ interface
+export interface FAQ {
+  id: string;
+  firestoreId?: string;
+  question: string;
+  answer: string;
+  category: string;
+  isActive: boolean;
+  order: number;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+// Firestore FAQ interface
+export interface FirestoreFAQ extends Omit<FAQ, 'id'> {
+  id?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 // Collection name for products
 const PRODUCTS_COLLECTION = 'products';
 
@@ -324,6 +344,118 @@ export class BlogService {
     } catch (error) {
       console.error('Error deleting blog: ', error);
       throw new Error('Failed to delete blog');
+    }
+  }
+}
+
+// Service class for FAQ operations
+export class FAQService {
+  private static COLLECTION = 'faqs';
+
+  // Add a new FAQ to Firestore
+  static async addFAQ(faqData: Omit<FAQ, 'id' | 'firestoreId' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    try {
+      const faqToAdd: Omit<FirestoreFAQ, 'id'> = {
+        ...faqData,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+
+      const docRef = await addDoc(collection(db, this.COLLECTION), faqToAdd);
+      console.log('FAQ added with ID: ', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding FAQ: ', error);
+      throw new Error('Failed to add FAQ');
+    }
+  }
+
+  // Get all FAQs from Firestore
+  static async getAllFAQs(): Promise<FAQ[]> {
+    try {
+      const q = query(collection(db, this.COLLECTION), orderBy('order', 'asc'));
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        firestoreId: doc.id,
+        ...doc.data()
+      })) as FAQ[];
+    } catch (error) {
+      console.error('Error getting FAQs: ', error);
+      throw new Error('Failed to fetch FAQs');
+    }
+  }
+
+  // Get active FAQs only
+  static async getActiveFAQs(): Promise<FAQ[]> {
+    try {
+      const allFAQs = await this.getAllFAQs();
+      return allFAQs.filter(faq => faq.isActive);
+    } catch (error) {
+      console.error('Error getting active FAQs: ', error);
+      throw new Error('Failed to fetch active FAQs');
+    }
+  }
+
+  // Get FAQs by category
+  static async getFAQsByCategory(category: string): Promise<FAQ[]> {
+    try {
+      const allFAQs = await this.getAllFAQs();
+      return allFAQs.filter(faq => faq.category.toLowerCase() === category.toLowerCase());
+    } catch (error) {
+      console.error('Error getting FAQs by category: ', error);
+      throw new Error('Failed to fetch FAQs by category');
+    }
+  }
+
+  // Update a FAQ in Firestore
+  static async updateFAQ(firestoreId: string, faqData: Partial<Omit<FAQ, 'id' | 'firestoreId' | 'createdAt'>>): Promise<void> {
+    try {
+      const faqRef = doc(db, this.COLLECTION, firestoreId);
+      const updateData = {
+        ...faqData,
+        updatedAt: Timestamp.now(),
+      };
+      
+      await updateDoc(faqRef, updateData);
+      console.log('FAQ updated successfully');
+    } catch (error) {
+      console.error('Error updating FAQ: ', error);
+      throw new Error('Failed to update FAQ');
+    }
+  }
+
+  // Delete a FAQ from Firestore
+  static async deleteFAQ(firestoreId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, this.COLLECTION, firestoreId));
+      console.log('FAQ deleted successfully');
+    } catch (error) {
+      console.error('Error deleting FAQ: ', error);
+      throw new Error('Failed to delete FAQ');
+    }
+  }
+
+  // Toggle FAQ active status
+  static async toggleFAQStatus(firestoreId: string, isActive: boolean): Promise<void> {
+    try {
+      await this.updateFAQ(firestoreId, { isActive });
+      console.log(`FAQ ${isActive ? 'activated' : 'deactivated'} successfully`);
+    } catch (error) {
+      console.error('Error toggling FAQ status: ', error);
+      throw new Error('Failed to toggle FAQ status');
+    }
+  }
+
+  // Update FAQ order for sorting
+  static async updateFAQOrder(firestoreId: string, newOrder: number): Promise<void> {
+    try {
+      await this.updateFAQ(firestoreId, { order: newOrder });
+      console.log('FAQ order updated successfully');
+    } catch (error) {
+      console.error('Error updating FAQ order: ', error);
+      throw new Error('Failed to update FAQ order');
     }
   }
 }

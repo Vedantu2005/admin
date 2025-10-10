@@ -1,40 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, HelpCircle, ChevronUp, ChevronDown } from 'lucide-react';
+import { FAQService, FAQ } from '../../firebase/productService';
 
 interface Faq {
   id: string;
   question: string;
   answer: string;
   isExpanded?: boolean;
+  category?: string;
+  order?: number;
+  isActive?: boolean;
 }
 
 const FaqManager: React.FC = () => {
-  const [faqs, setFaqs] = useState<Faq[]>([
-    {
-      id: '1',
-      question: 'What services do you offer?',
-      answer: 'We offer a comprehensive range of services including web development, mobile app development, digital marketing, and business consulting. Our team specializes in creating custom solutions tailored to meet your specific business needs and objectives.',
-      isExpanded: false
-    },
-    {
-      id: '2',
-      question: 'How long does a typical project take?',
-      answer: 'Project timelines vary depending on the scope and complexity of the work. Simple websites typically take 2-4 weeks, while complex web applications can take 2-6 months. We provide detailed project timelines during the initial consultation phase and keep you updated throughout the development process.',
-      isExpanded: false
-    },
-    {
-      id: '3',
-      question: 'Do you provide ongoing support and maintenance?',
-      answer: 'Yes, we offer comprehensive support and maintenance packages for all our projects. This includes regular updates, security patches, performance optimization, and technical support. We have different support tiers available to match your specific needs and budget requirements.',
-      isExpanded: false
-    },
-    {
-      id: '4',
-      question: 'What is your pricing structure?',
-      answer: 'Our pricing is project-based and depends on various factors including complexity, timeline, and specific requirements. We offer competitive rates and provide detailed quotes after understanding your project needs. We also offer flexible payment plans and can work within different budget ranges.',
-      isExpanded: false
+  const [faqs, setFaqs] = useState<Faq[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Load FAQs from Firebase on component mount
+  useEffect(() => {
+    loadFAQs();
+  }, []);
+
+  const loadFAQs = async () => {
+    try {
+      setLoading(true);
+      const allFAQs = await FAQService.getAllFAQs();
+      // Convert Firebase FAQs to local FAQ interface
+      const convertedFAQs: Faq[] = allFAQs.map(faq => ({
+        id: faq.id,
+        question: faq.question,
+        answer: faq.answer,
+        isExpanded: false,
+        category: faq.category,
+        order: faq.order,
+        isActive: faq.isActive
+      }));
+      setFaqs(convertedFAQs);
+    } catch (error) {
+      console.error('Error loading FAQs:', error);
+      // If Firebase fails, show empty array (you can add fallback data here if needed)
+      setFaqs([]);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingFaq, setEditingFaq] = useState<Faq | null>(null);
   const [formData, setFormData] = useState({
@@ -42,18 +52,50 @@ const FaqManager: React.FC = () => {
     answer: ''
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingFaq) {
-      setFaqs(faqs.map(faq => 
-        faq.id === editingFaq.id 
-          ? { ...formData, id: editingFaq.id, isExpanded: false }
-          : faq
-      ));
-    } else {
-      setFaqs([...faqs, { ...formData, id: Date.now().toString(), isExpanded: false }]);
+    
+    try {
+      const faqData = {
+        question: formData.question,
+        answer: formData.answer,
+        category: 'General', // Default category
+        isActive: true,
+        order: faqs.length + 1
+      };
+      
+      if (editingFaq) {
+        // Update existing FAQ in Firebase
+        await FAQService.updateFAQ(editingFaq.id, faqData);
+        // Update local state
+        setFaqs(faqs.map(faq => 
+          faq.id === editingFaq.id 
+            ? { ...faq, question: formData.question, answer: formData.answer }
+            : faq
+        ));
+        alert('FAQ updated successfully!');
+      } else {
+        // Add new FAQ to Firebase
+        const newFaqId = await FAQService.addFAQ(faqData);
+        // Update local state
+        const newFaq: Faq = {
+          id: newFaqId,
+          question: formData.question,
+          answer: formData.answer,
+          isExpanded: false,
+          category: 'General',
+          order: faqs.length + 1,
+          isActive: true
+        };
+        setFaqs([...faqs, newFaq]);
+        alert('FAQ added successfully!');
+      }
+      
+      resetForm();
+    } catch (error) {
+      console.error('Error saving FAQ:', error);
+      alert('Failed to save FAQ. Please try again.');
     }
-    resetForm();
   };
 
   const resetForm = () => {
@@ -71,8 +113,21 @@ const FaqManager: React.FC = () => {
     setIsFormOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setFaqs(faqs.filter(faq => faq.id !== id));
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this FAQ?')) {
+      return;
+    }
+    
+    try {
+      // Delete from Firebase
+      await FAQService.deleteFAQ(id);
+      // Update local state
+      setFaqs(faqs.filter(faq => faq.id !== id));
+      alert('FAQ deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting FAQ:', error);
+      alert('Failed to delete FAQ. Please try again.');
+    }
   };
 
   const toggleExpand = (id: string) => {
@@ -147,8 +202,13 @@ const FaqManager: React.FC = () => {
         </div>
       )}
 
-      <div className="space-y-4">
-        {faqs.map((faq) => (
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-600">Loading FAQs...</div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {faqs.map((faq) => (
           <div key={faq.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
             <div 
               className="flex items-center justify-between p-6 cursor-pointer hover:bg-gray-50 transition-colors"
@@ -194,14 +254,15 @@ const FaqManager: React.FC = () => {
           </div>
         ))}
 
-        {faqs.length === 0 && (
+        {faqs.length === 0 && !loading && (
           <div className="text-center py-12 bg-white rounded-lg shadow-lg">
             <HelpCircle className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No FAQs</h3>
             <p className="mt-1 text-sm text-gray-500">Get started by creating your first FAQ.</p>
           </div>
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
