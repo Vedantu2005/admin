@@ -75,6 +75,9 @@ export interface GiftProduct {
     category: string;
     mrp: number;
     contents: string;
+    description?: string; // Product description
+    otherImages?: string[]; // Array of additional image URLs
+    productFaqs?: ProductFaq[]; // Product FAQs
     status: 'Active' | 'Inactive';
 }
 
