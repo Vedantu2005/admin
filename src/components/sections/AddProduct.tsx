@@ -392,25 +392,60 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
               <label className="block text-sm font-medium text-gray-600 mb-1">Main Image</label>
               <input type="file" ref={mainImageInputRef} onChange={handleMainImageChange} className="hidden" accept="image/*" />
               <div onClick={() => mainImageInputRef.current?.click()} className="relative group border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center cursor-pointer hover:border-[#703102] transition-colors">
-                {mainImage ? <img src={URL.createObjectURL(mainImage)} alt="Main preview" className="max-h-full max-w-full object-contain" /> : <p className="text-gray-400 text-center">Click to upload main image</p>}
-                {mainImage && <button onClick={(e) => { e.stopPropagation(); setMainImage(null); }} className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove main image">✕</button>}
+                {mainImage ? (
+                  <img src={URL.createObjectURL(mainImage)} alt="Main preview" className="max-h-full max-w-full object-contain" />
+                ) : productToEdit?.mainImage ? (
+                  <img src={productToEdit.mainImage} alt="Current main image" className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <p className="text-gray-400 text-center">Click to upload main image</p>
+                )}
+                {(mainImage || productToEdit?.mainImage) && (
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setMainImage(null); 
+                      // Note: This only clears the new upload, existing image remains in productToEdit
+                    }} 
+                    className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" 
+                    aria-label="Remove main image"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1">Other Images (max 5)</label>
-              <input type="file" ref={otherImagesInputRef} onChange={handleOtherImagesChange} className="hidden" accept="image/*" multiple disabled={otherImages.length >= 5} />
-              <div onClick={() => otherImages.length < 5 && otherImagesInputRef.current?.click()} className={`border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center transition-colors ${otherImages.length < 5 ? 'cursor-pointer hover:border-[#703102]' : 'cursor-not-allowed bg-gray-100'}`}>
-                {otherImages.length > 0 ? (
+              <input type="file" ref={otherImagesInputRef} onChange={handleOtherImagesChange} className="hidden" accept="image/*" multiple disabled={(otherImages.length + (productToEdit?.otherImages?.length || 0)) >= 5} />
+              <div onClick={() => (otherImages.length + (productToEdit?.otherImages?.length || 0)) < 5 && otherImagesInputRef.current?.click()} className={`border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center transition-colors ${(otherImages.length + (productToEdit?.otherImages?.length || 0)) < 5 ? 'cursor-pointer hover:border-[#703102]' : 'cursor-not-allowed bg-gray-100'}`}>
+                {(otherImages.length > 0 || (productToEdit?.otherImages && productToEdit.otherImages.length > 0)) ? (
                   <div className="grid grid-cols-3 gap-2 w-full h-full overflow-y-auto">
+                    {/* Show existing images from database */}
+                    {productToEdit?.otherImages?.map((imageUrl, index) => (
+                      <div key={`existing-${index}`} className="relative group w-full h-24">
+                        <img src={imageUrl} alt={`Existing image ${index + 1}`} className="w-full h-full object-cover rounded" />
+                        <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-1 leading-none w-5 h-5 flex items-center justify-center text-xs">
+                          ✓
+                        </div>
+                      </div>
+                    ))}
+                    {/* Show new images being uploaded */}
                     {otherImages.map((file, index) => (
-                      <div key={index} className="relative group w-full h-24">
+                      <div key={`new-${index}`} className="relative group w-full h-24">
                         <img src={URL.createObjectURL(file)} alt={`Other preview ${index + 1}`} className="w-full h-full object-cover rounded" />
                         <button onClick={(e) => { e.stopPropagation(); removeOtherImage(index); }} className="absolute top-1 right-1 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove image">✕</button>
                       </div>
                     ))}
-                    {otherImages.length < 5 && <div className="w-full h-24 flex items-center justify-center border border-gray-200 rounded text-gray-400 text-sm">Add More ({5 - otherImages.length} left)</div>}
+                    {/* Show add more slot if under limit */}
+                    {(otherImages.length + (productToEdit?.otherImages?.length || 0)) < 5 && (
+                      <div className="w-full h-24 flex items-center justify-center border border-gray-200 rounded text-gray-400 text-sm">
+                        Add More ({5 - otherImages.length - (productToEdit?.otherImages?.length || 0)} left)
+                      </div>
+                    )}
                   </div>
-                ) : <p className="text-gray-400 text-center">Click to upload images</p>}
+                ) : (
+                  <p className="text-gray-400 text-center">Click to upload images</p>
+                )}
               </div>
             </div>
           </div>

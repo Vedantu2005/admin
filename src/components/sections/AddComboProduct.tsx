@@ -1,6 +1,7 @@
 import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { ComboProduct } from '../Dashboard'; // Use the ComboProduct type
+import { uploadImageToCloudinary, uploadMultipleImagesToCloudinary, validateImageFile } from '../../firebase/imageService';
 
 // --- Define props interface ---
 interface AddComboProductProps {
@@ -35,6 +36,10 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
     const [mainImage, setMainImage] = useState<File | null>(null);
     const [otherImages, setOtherImages] = useState<File[]>([]);
     
+    // Upload states
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    
     const [variants, setVariants] = useState<ProductVariant[]>([
         { id: Date.now() + 1, bottleSize: 'Standard Combo', actualMRP: 420, sellingMRP: 360, discount: 14, pricePerLiter: 0 },
     ]);
@@ -59,12 +64,26 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
     useEffect(() => {
         if (productToEdit) {
             setFormState({
-                ...initialFormState,
-                productName: productToEdit.category,
-                category: productToEdit.category,
-                actualMRP: productToEdit.actualMRP,
-                sellingMRP: productToEdit.sellingMRP,
+                productName: productToEdit.productName || '',
+                category: productToEdit.category || '',
+                shortDescription: productToEdit.shortDescription || '',
+                rating: productToEdit.rating || '',
+                longDescription: productToEdit.longDescription || '',
+                actualMRP: productToEdit.actualMRP || 0,
+                sellingMRP: productToEdit.sellingMRP || 0,
+                discount: 0, // Calculate from actualMRP and sellingMRP
+                ingredients: productToEdit.ingredients || '',
+                benefits: productToEdit.benefits || '',
+                storageInfo: productToEdit.storageInfo || ''
             });
+            
+            // Populate variants and FAQs if they exist
+            if (productToEdit.productVariants) {
+                setVariants(productToEdit.productVariants);
+            }
+            if (productToEdit.productFaqs) {
+                setFaqs(productToEdit.productFaqs);
+            }
         } else {
             handleReset();
         }
@@ -89,33 +108,120 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
         if (otherImagesInputRef.current) otherImagesInputRef.current.value = '';
     };
     
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formState.productName || !formState.category || formState.sellingMRP <= 0) {
             alert('Please fill out Combo Name, Category, and Selling MRP.');
             return;
         }
-        const productData = {
-            image: mainImage ? URL.createObjectURL(mainImage) : productToEdit?.image || 'https://via.placeholder.com/40',
-            category: formState.productName,
-            actualMRP: Number(formState.actualMRP),
-            sellingMRP: Number(formState.sellingMRP),
-            variants: variants.length
-        };
-        onSaveProduct(productData, productToEdit ? productToEdit.id : null);
-        alert(productToEdit ? 'Combo Product updated successfully!' : 'Combo Product added successfully!');
+
+        setIsUploading(true);
+        setUploadProgress(0);
+        
+        try {
+            let mainImageUrl = productToEdit?.mainImage || '';
+            let otherImageUrls: string[] = productToEdit?.otherImages || [];
+
+            // Upload main image if selected
+            if (mainImage) {
+                try {
+                    const validation = validateImageFile(mainImage);
+                    if (!validation.isValid) {
+                        alert(`Main image error: ${validation.error}`);
+                        setIsUploading(false);
+                        return;
+                    }
+                    setUploadProgress(20);
+                    mainImageUrl = await uploadImageToCloudinary(mainImage, 'dev-admin/combo-products');
+                    setUploadProgress(50);
+                } catch (error) {
+                    console.error('Main image upload failed:', error);
+                    alert(`Failed to upload main image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                    setIsUploading(false);
+                    return;
+                }
+            }
+
+            // Upload other images if selected
+            if (otherImages.length > 0) {
+                try {
+                    setUploadProgress(60);
+                    const uploadedUrls = await uploadMultipleImagesToCloudinary(otherImages, 'dev-admin/combo-products');
+                    otherImageUrls = [...(productToEdit?.otherImages || []), ...uploadedUrls];
+                    setUploadProgress(80);
+                } catch (error) {
+                    console.error('Other images upload failed:', error);
+                    alert(`Failed to upload other images: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                    setIsUploading(false);
+                    return;
+                }
+            }
+
+            setUploadProgress(90);
+
+            const productData = {
+                productName: formState.productName,
+                category: formState.category,
+                shortDescription: formState.shortDescription,
+                rating: formState.rating,
+                longDescription: formState.longDescription,
+                actualMRP: Number(formState.actualMRP),
+                sellingMRP: Number(formState.sellingMRP),
+                discount: formState.discount,
+                ingredients: formState.ingredients,
+                benefits: formState.benefits,
+                storageInfo: formState.storageInfo,
+                mainImage: mainImageUrl,
+                otherImages: otherImageUrls,
+                image: mainImageUrl, // For backward compatibility
+                variants: variants.length,
+                productVariants: variants,
+                productFaqs: faqs
+            };
+
+            setUploadProgress(100);
+            onSaveProduct(productData, productToEdit ? productToEdit.id : null);
+            alert(productToEdit ? 'Combo Product updated successfully!' : 'Combo Product added successfully!');
+            
+        } catch (error) {
+            console.error('Save operation failed:', error);
+            alert(`Failed to save combo product: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        } finally {
+            setIsUploading(false);
+            setUploadProgress(0);
+        }
     };
 
     // --- IMAGE HANDLERS ---
     const handleMainImageChange = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file) setMainImage(file);
+        if (file) {
+            const validation = validateImageFile(file);
+            if (!validation.isValid) {
+                alert(`Main image error: ${validation.error}`);
+                if (mainImageInputRef.current) mainImageInputRef.current.value = '';
+                return;
+            }
+            setMainImage(file);
+        }
     };
+    
     const handleOtherImagesChange = (event: ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
         if (files) {
-        const newFiles = Array.from(files);
-        setOtherImages(prev => [...prev, ...newFiles].slice(0, 5));
-        if (otherImagesInputRef.current) otherImagesInputRef.current.value = '';
+            const newFiles = Array.from(files);
+            
+            // Validate each file
+            for (const file of newFiles) {
+                const validation = validateImageFile(file);
+                if (!validation.isValid) {
+                    alert(`Image "${file.name}" error: ${validation.error}`);
+                    if (otherImagesInputRef.current) otherImagesInputRef.current.value = '';
+                    return;
+                }
+            }
+            
+            setOtherImages(prev => [...prev, ...newFiles].slice(0, 5));
+            if (otherImagesInputRef.current) otherImagesInputRef.current.value = '';
         }
     };
     const removeOtherImage = (indexToRemove: number) => {
@@ -248,25 +354,53 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
               <label className="block text-sm font-medium text-gray-600 mb-1">Main Image</label>
               <input type="file" ref={mainImageInputRef} onChange={handleMainImageChange} className="hidden" accept="image/*" />
               <div onClick={() => mainImageInputRef.current?.click()} className="relative group border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center cursor-pointer hover:border-[#703102] transition-colors">
-                {mainImage ? <img src={URL.createObjectURL(mainImage)} alt="Main preview" className="max-h-full max-w-full object-contain" /> : <p className="text-gray-400 text-center">Click to upload main image</p>}
-                {mainImage && <button onClick={(e) => { e.stopPropagation(); setMainImage(null); }} className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove main image">✕</button>}
+                {mainImage ? (
+                  <>
+                    <img src={URL.createObjectURL(mainImage)} alt="Main preview" className="max-h-full max-w-full object-contain" />
+                    <button onClick={(e) => { e.stopPropagation(); setMainImage(null); }} className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove main image">✕</button>
+                  </>
+                ) : productToEdit?.mainImage ? (
+                  <>
+                    <img src={productToEdit.mainImage} alt="Existing main image" className="max-h-full max-w-full object-contain" />
+                    <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center text-xs">✓</div>
+                  </>
+                ) : (
+                  <p className="text-gray-400 text-center">Click to upload main image</p>
+                )}
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1">Other Images (max 5)</label>
-              <input type="file" ref={otherImagesInputRef} onChange={handleOtherImagesChange} className="hidden" accept="image/*" multiple disabled={otherImages.length >= 5} />
-              <div onClick={() => otherImages.length < 5 && otherImagesInputRef.current?.click()} className={`border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center transition-colors ${otherImages.length < 5 ? 'cursor-pointer hover:border-[#703102]' : 'cursor-not-allowed bg-gray-100'}`}>
-                {otherImages.length > 0 ? (
+              <input type="file" ref={otherImagesInputRef} onChange={handleOtherImagesChange} className="hidden" accept="image/*" multiple disabled={(otherImages.length + (productToEdit?.otherImages?.length || 0)) >= 5} />
+              <div onClick={() => (otherImages.length + (productToEdit?.otherImages?.length || 0)) < 5 && otherImagesInputRef.current?.click()} className={`border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center transition-colors ${(otherImages.length + (productToEdit?.otherImages?.length || 0)) < 5 ? 'cursor-pointer hover:border-[#703102]' : 'cursor-not-allowed bg-gray-100'}`}>
+                {(otherImages.length > 0 || (productToEdit?.otherImages && productToEdit.otherImages.length > 0)) ? (
                   <div className="grid grid-cols-3 gap-2 w-full h-full overflow-y-auto">
+                    {/* Show existing images from database */}
+                    {productToEdit?.otherImages?.map((imageUrl, index) => (
+                      <div key={`existing-${index}`} className="relative group w-full h-24">
+                        <img src={imageUrl} alt={`Existing image ${index + 1}`} className="w-full h-full object-cover rounded" />
+                        <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-1 leading-none w-5 h-5 flex items-center justify-center text-xs">
+                          ✓
+                        </div>
+                      </div>
+                    ))}
+                    {/* Show new images being uploaded */}
                     {otherImages.map((file, index) => (
-                      <div key={index} className="relative group w-full h-24">
+                      <div key={`new-${index}`} className="relative group w-full h-24">
                         <img src={URL.createObjectURL(file)} alt={`Other preview ${index + 1}`} className="w-full h-full object-cover rounded" />
                         <button onClick={(e) => { e.stopPropagation(); removeOtherImage(index); }} className="absolute top-1 right-1 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove image">✕</button>
                       </div>
                     ))}
-                    {otherImages.length < 5 && <div className="w-full h-24 flex items-center justify-center border border-gray-200 rounded text-gray-400 text-sm">Add More ({5 - otherImages.length} left)</div>}
+                    {/* Show add more slot if under limit */}
+                    {(otherImages.length + (productToEdit?.otherImages?.length || 0)) < 5 && (
+                      <div className="w-full h-24 flex items-center justify-center border border-gray-200 rounded text-gray-400 text-sm">
+                        Add More ({5 - otherImages.length - (productToEdit?.otherImages?.length || 0)} left)
+                      </div>
+                    )}
                   </div>
-                ) : <p className="text-gray-400 text-center">Click to upload images</p>}
+                ) : (
+                  <p className="text-gray-400 text-center">Click to upload images</p>
+                )}
               </div>
             </div>
           </div>
@@ -372,10 +506,31 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
         
         {/* Footer Buttons */}
         <div className="flex justify-start space-x-4 mt-6">
-            <button onClick={handleSave} className="px-6 py-2 text-white font-semibold rounded-md transition" style={{ backgroundColor: '#703102' }}>
-                {productToEdit ? 'UPDATE COMBO PRODUCT' : 'ADD COMBO PRODUCT'}
+            <button 
+                onClick={handleSave} 
+                disabled={isUploading}
+                className="px-6 py-2 text-white font-semibold rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed" 
+                style={{ backgroundColor: isUploading ? '#9CA3AF' : '#703102' }}
+            >
+                {isUploading ? (
+                    <span className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Uploading... {uploadProgress}%
+                    </span>
+                ) : (
+                    productToEdit ? 'UPDATE COMBO PRODUCT' : 'ADD COMBO PRODUCT'
+                )}
             </button>
-            <button type="button" onClick={handleReset} className="px-6 py-2 text-white font-semibold rounded-md transition" style={{ backgroundColor: '#703102' }}>
+            <button 
+                type="button" 
+                onClick={handleReset} 
+                disabled={isUploading}
+                className="px-6 py-2 text-white font-semibold rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed" 
+                style={{ backgroundColor: isUploading ? '#9CA3AF' : '#703102' }}
+            >
                 RESET
             </button>
         </div>
