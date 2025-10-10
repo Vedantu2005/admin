@@ -459,3 +459,106 @@ export class FAQService {
     }
   }
 }
+
+// Podcast interface - matches exact UI structure
+export interface Podcast {
+  id: string;
+  firestoreId?: string;
+  title: string;
+  image: string;
+  description: string;
+  youtubeLink: string;
+  adminName: string;
+  date: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+// Firestore Podcast interface
+export interface FirestorePodcast extends Omit<Podcast, 'id'> {
+  id?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+// Collection name for podcasts
+const PODCASTS_COLLECTION = 'podcasts';
+
+// Service class for podcast operations
+export class PodcastService {
+  // Add a new podcast to Firestore
+  static async addPodcast(podcastData: Omit<Podcast, 'id' | 'firestoreId' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    try {
+      const podcastToAdd: Omit<FirestorePodcast, 'id'> = {
+        ...podcastData,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+
+      const docRef = await addDoc(collection(db, PODCASTS_COLLECTION), podcastToAdd);
+      console.log('Podcast added with ID: ', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding podcast: ', error);
+      throw new Error('Failed to add podcast');
+    }
+  }
+
+  // Get all podcasts from Firestore
+  static async getAllPodcasts(): Promise<Podcast[]> {
+    try {
+      const q = query(collection(db, PODCASTS_COLLECTION), orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      const podcasts: Podcast[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data() as FirestorePodcast;
+        podcasts.push({
+          id: data.id || doc.id,
+          firestoreId: doc.id,
+          title: data.title || '',
+          image: data.image || '',
+          description: data.description || '',
+          youtubeLink: data.youtubeLink || '',
+          adminName: data.adminName || '',
+          date: data.date || '',
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        });
+      });
+
+      return podcasts;
+    } catch (error) {
+      console.error('Error getting podcasts: ', error);
+      throw new Error('Failed to fetch podcasts');
+    }
+  }
+
+  // Update an existing podcast
+  static async updatePodcast(firestoreId: string, updateData: Partial<Omit<Podcast, 'id' | 'firestoreId'>>): Promise<void> {
+    try {
+      const podcastRef = doc(db, PODCASTS_COLLECTION, firestoreId);
+      const updatePayload = {
+        ...updateData,
+        updatedAt: Timestamp.now(),
+      };
+
+      await updateDoc(podcastRef, updatePayload);
+      console.log('Podcast updated successfully');
+    } catch (error) {
+      console.error('Error updating podcast: ', error);
+      throw new Error('Failed to update podcast');
+    }
+  }
+
+  // Delete a podcast
+  static async deletePodcast(firestoreId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, PODCASTS_COLLECTION, firestoreId));
+      console.log('Podcast deleted successfully');
+    } catch (error) {
+      console.error('Error deleting podcast: ', error);
+      throw new Error('Failed to delete podcast');
+    }
+  }
+}

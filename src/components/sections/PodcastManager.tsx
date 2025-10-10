@@ -1,99 +1,135 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Edit2, Trash2, Mic,  User, CalendarDays, X } from 'lucide-react';
-
-interface Podcast {
-  id: string;
-  title: string;
-  image: string;
-  description: string;
-  youtubeLink: string;
-  adminName: string; // Changed from 'Dev Natural Oils' to be dynamic
-  date: string;
-}
+import { PodcastService, Podcast } from '../../firebase/productService';
+import { uploadImageToCloudinary, validateImageFile } from '../../firebase/imageService';
 
 const PodcastManager: React.FC = () => {
-  const [podcasts, setPodcasts] = useState<Podcast[]>([
-    {
-      id: '1',
-      title: 'Wood Pressed Wisdom: Unlock the Secrets of Pure Oils',
-      image: '/podcast.png',
-      description: 'Learn how wood pressed oils are crafted, their health benefits, and simple ways to identify genuine products. Discover the science behind cold extraction, compare nutrition with regular oils, and hear expert insights.',
-      youtubeLink: 'https://www.youtube.com/watch?v=your_video_id_1', // Placeholder YouTube link
-      adminName: 'Dev Natural Oils',
-      date: '2025-08-21'
-    },
-    {
-      id: '2',
-      title: 'The Art of Traditional Indian Cooking Oils',
-      image: 'https://images.pexels.com/photos/10368560/pexels-photo-10368560.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      description: 'Dive into the rich history and cultural significance of traditional Indian cooking oils. From mustard to sesame, explore unique flavors, health properties, and authentic recipes that have been passed down through generations.',
-      youtubeLink: 'https://www.youtube.com/watch?v=your_video_id_2', // Placeholder YouTube link
-      adminName: 'Dev Natural Oils',
-      date: '2025-08-15'
-    },
-    {
-      id: '3',
-      title: 'Beyond the Kitchen: Uses of Natural Oils',
-      image: '/podcast.png',
-      description: 'Uncover the versatile applications of natural oils beyond culinary uses. Explore their benefits in skincare, hair care, and traditional remedies. Learn how to incorporate these pure oils into your daily wellness routine for holistic health.',
-      youtubeLink: 'https://www.youtube.com/watch?v=your_video_id_3', // Placeholder YouTube link
-      adminName: 'Dev Natural Oils',
-      date: '2025-08-08'
-    },
-  ]);
+  const [podcasts, setPodcasts] = useState<Podcast[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
 
-  const initialFormState = {
+  // Load podcasts from Firebase on component mount
+  useEffect(() => {
+    loadPodcasts();
+  }, []);
+
+  const loadPodcasts = async () => {
+    try {
+      setLoading(true);
+      const allPodcasts = await PodcastService.getAllPodcasts();
+      setPodcasts(allPodcasts);
+    } catch (error) {
+      console.error('Error loading podcasts:', error);
+      alert('Failed to load podcasts');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const initialFormState = useMemo(() => ({
     title: '',
     image: '',
     description: '',
     youtubeLink: '',
     adminName: '',
     date: ''
-  };
+  }), []);
 
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [editingPodcast, setEditingPodcast] = useState<Podcast | null>(null);
   const [formData, setFormData] = useState(initialFormState);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingPodcast) {
-      setPodcasts(podcasts.map(podcast =>
-        podcast.id === editingPodcast.id
-          ? { ...formData, id: editingPodcast.id }
-          : podcast
-      ));
-    } else {
-      setPodcasts([...podcasts, { ...formData, id: Date.now().toString() }]);
-    }
-    resetForm();
-  };
-
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setFormData(initialFormState);
     setIsAddFormOpen(false);
     setEditingPodcast(null);
-  };
+  }, [initialFormState]);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUploading(true);
+    
+    try {
+      let imageUrl = formData.image;
+      
+      // If image is a file (base64), upload to Cloudinary
+      if (imageUrl && imageUrl.startsWith('data:')) {
+        // Convert base64 to File
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], 'podcast-image.jpg', { type: 'image/jpeg' });
+        
+        // Validate and upload
+        const validation = validateImageFile(file);
+        if (!validation.isValid) {
+          alert(`Image error: ${validation.error}`);
+          setUploading(false);
+          return;
+        }
+        
+        imageUrl = await uploadImageToCloudinary(file, 'dev-admin/podcasts');
+      }
+      
+      const podcastData = {
+        title: formData.title,
+        image: imageUrl,
+        description: formData.description,
+        youtubeLink: formData.youtubeLink,
+        adminName: formData.adminName,
+        date: formData.date
+      };
+      
+      if (editingPodcast) {
+        // Update existing podcast
+        await PodcastService.updatePodcast(editingPodcast.firestoreId || editingPodcast.id, podcastData);
+        await loadPodcasts();
+        alert('Podcast updated successfully!');
+      } else {
+        // Add new podcast
+        await PodcastService.addPodcast(podcastData);
+        await loadPodcasts();
+        alert('Podcast added successfully!');
+      }
+      
+      resetForm();
+    } catch (error) {
+      console.error('Error saving podcast:', error);
+      alert('Failed to save podcast. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  }, [formData, editingPodcast, resetForm]);
 
   const handleEdit = (podcast: Podcast) => {
     setEditingPodcast(podcast);
     setFormData(podcast);
   };
 
-  const handleDelete = (id: string) => {
-    setPodcasts(podcasts.filter(podcast => podcast.id !== id));
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this podcast?')) {
+      return;
+    }
+    
+    try {
+      await PodcastService.deletePodcast(id);
+      await loadPodcasts();
+      alert('Podcast deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting podcast:', error);
+      alert('Failed to delete podcast. Please try again.');
+    }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setFormData({ ...formData, image: e.target?.result as string });
+        setFormData(prev => ({ ...prev, image: e.target?.result as string }));
       };
       reader.readAsDataURL(file);
     }
-  };
+  }, []);
 
   // Helper to format date for display
   const formatDate = (dateString: string) => {
@@ -101,17 +137,50 @@ const PodcastManager: React.FC = () => {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
-  // Reusable Form Component
-  const PodcastForm = ({ onCancel }: { onCancel: () => void }) => (
+  // Handler functions for form inputs
+  const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, title: e.target.value }));
+  }, []);
+
+  const handleAdminNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, adminName: e.target.value }));
+  }, []);
+
+  const handleYoutubeLinkChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, youtubeLink: e.target.value }));
+  }, []);
+
+  const handleDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, date: e.target.value }));
+  }, []);
+
+  const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setFormData(prev => ({ ...prev, description: e.target.value }));
+  }, []);
+
+  // Reusable Form Component - Memoized to prevent re-renders
+  const renderPodcastForm = useMemo(() => (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Podcast Title</label>
-          <input type="text" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+          <input 
+            type="text" 
+            value={formData.title} 
+            onChange={handleTitleChange} 
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
+            required 
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Admin Name</label>
-          <input type="text" value={formData.adminName} onChange={(e) => setFormData({ ...formData, adminName: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+          <input 
+            type="text" 
+            value={formData.adminName} 
+            onChange={handleAdminNameChange} 
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
+            required 
+          />
         </div>
       </div>
 
@@ -123,25 +192,58 @@ const PodcastManager: React.FC = () => {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">YouTube Link</label>
-        <input type="url" value={formData.youtubeLink} onChange={(e) => setFormData({ ...formData, youtubeLink: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" placeholder="https://youtube.com/watch?v=..." required />
+        <input 
+          type="url" 
+          value={formData.youtubeLink} 
+          onChange={handleYoutubeLinkChange} 
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
+          placeholder="https://youtube.com/watch?v=..." 
+          required 
+        />
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-        <input type="date" value={formData.date} onChange={(e) => setFormData({ ...formData, date: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+        <input 
+          type="date" 
+          value={formData.date} 
+          onChange={handleDateChange} 
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
+          required 
+        />
       </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-        <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={4} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+        <textarea 
+          value={formData.description} 
+          onChange={handleDescriptionChange} 
+          rows={4} 
+          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" 
+          required 
+        />
       </div>
 
       <div className="flex space-x-3">
-        <button type="submit" className="px-6 py-2 rounded-lg text-white transition-colors" style={{ backgroundColor: '#499E47' }}>{editingPodcast ? 'Update' : 'Create'} Podcast</button>
-        <button type="button" onClick={onCancel} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+        <button 
+          type="submit" 
+          disabled={uploading}
+          className="px-6 py-2 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+          style={{ backgroundColor: '#499E47' }}
+        >
+          {uploading ? 'Saving...' : (editingPodcast ? 'Update' : 'Create')} Podcast
+        </button>
+        <button 
+          type="button" 
+          onClick={resetForm} 
+          disabled={uploading}
+          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Cancel
+        </button>
       </div>
     </form>
-  );
+  ), [formData, uploading, editingPodcast, handleSubmit, handleTitleChange, handleAdminNameChange, handleImageUpload, handleYoutubeLinkChange, handleDateChange, handleDescriptionChange, resetForm]);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gray-50/50 min-h-screen">
@@ -161,7 +263,7 @@ const PodcastManager: React.FC = () => {
       {isAddFormOpen && (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4" style={{ color: '#703102' }}>Add New Podcast</h2>
-          <PodcastForm onCancel={resetForm} />
+          {renderPodcastForm}
         </div>
       )}
 
@@ -171,57 +273,63 @@ const PodcastManager: React.FC = () => {
            <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
             <button onClick={resetForm} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={24}/></button>
             <h2 className="text-xl font-semibold mb-4" style={{ color: '#703102' }}>Edit Podcast</h2>
-            <PodcastForm onCancel={resetForm} />
+            {renderPodcastForm}
           </div>
         </div>
       )}
 
       {/* --- PODCAST CARDS DISPLAY --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {podcasts.map((podcast) => (
-          <div key={podcast.id} className="bg-white rounded-xl shadow-lg overflow-hidden group border border-gray-100 transition-shadow duration-300" style={{ backgroundColor: '#000000' }}>
-            <div className="relative">
-              <img src={podcast.image} alt={podcast.title} className="w-full h-48 object-cover" />
-              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-2">
-                <button onClick={() => handleEdit(podcast)} className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600"><Edit2 size={14} /></button>
-                <button onClick={() => handleDelete(podcast.id)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600"><Trash2 size={14} /></button>
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-600">Loading podcasts...</div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {podcasts.map((podcast) => (
+            <div key={podcast.id} className="bg-white rounded-xl shadow-lg overflow-hidden group border border-gray-100 transition-shadow duration-300" style={{ backgroundColor: '#000000' }}>
+              <div className="relative">
+                <img src={podcast.image} alt={podcast.title} className="w-full h-48 object-cover" />
+                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-2">
+                  <button onClick={() => handleEdit(podcast)} className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600"><Edit2 size={14} /></button>
+                  <button onClick={() => handleDelete(podcast.firestoreId || podcast.id)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600"><Trash2 size={14} /></button>
+                </div>
+              </div>
+              <div className="p-6 text-white">
+                <div className="flex items-center text-sm mb-2" style={{ color: '#AE5D01' }}>
+                  <User size={16} className="mr-2" />
+                  <span>{podcast.adminName}</span>
+                  <CalendarDays size={16} className="ml-14 mr-2" />
+                  <span>{formatDate(podcast.date)}</span>
+                </div>
+                <h3 className="font-bold text-xl mb-2">{podcast.title}</h3>
+                <p className="text-gray-300 text-sm mb-4 line-clamp-3">
+                  {podcast.description}
+                </p>
+                {/* --- MODIFIED BUTTON SECTION --- */}
+                <div className="flex justify-center mt-4"> {/* Added flex justify-center */}
+                  <a
+                    href={podcast.youtubeLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+                    style={{ backgroundColor: '#703102', color: 'white' }}
+                  >
+                    {/* Removed Mic icon */}
+                    BROWSE PODCAST
+                  </a>
+                </div>
               </div>
             </div>
-            <div className="p-6 text-white">
-              <div className="flex items-center text-sm mb-2" style={{ color: '#AE5D01' }}>
-                <User size={16} className="mr-2" />
-                <span>{podcast.adminName}</span>
-                <CalendarDays size={16} className="ml-14 mr-2" />
-                <span>{formatDate(podcast.date)}</span>
-              </div>
-              <h3 className="font-bold text-xl mb-2">{podcast.title}</h3>
-              <p className="text-gray-300 text-sm mb-4 line-clamp-3">
-                {podcast.description}
-              </p>
-              {/* --- MODIFIED BUTTON SECTION --- */}
-              <div className="flex justify-center mt-4"> {/* Added flex justify-center */}
-                <a
-                  href={podcast.youtubeLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
-                  style={{ backgroundColor: '#703102', color: 'white' }}
-                >
-                  {/* Removed Mic icon */}
-                  BROWSE PODCAST
-                </a>
-              </div>
+          ))}
+          {podcasts.length === 0 && !loading && (
+            <div className="text-center py-12 col-span-full">
+              <Mic className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No podcasts</h3>
+              <p className="mt-1 text-sm text-gray-500">Get started by creating a new podcast.</p>
             </div>
-          </div>
-        ))}
-        {podcasts.length === 0 && (
-          <div className="text-center py-12 col-span-full">
-            <Mic className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No podcasts</h3>
-            <p className="mt-1 text-sm text-gray-500">Get started by creating a new podcast.</p>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
