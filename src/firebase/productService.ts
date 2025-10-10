@@ -12,6 +12,21 @@ import {
 import { db } from './config';
 import { Product, GiftProduct } from '../components/Dashboard';
 
+// Blog interface
+export interface Blog {
+  id: string;
+  firestoreId?: string;
+  title: string;
+  image: string;
+  description: string;
+  date: string;
+  category: string;
+  author: string;
+  readTime: number;
+  tags: string[];
+  detail: string;
+}
+
 // Collection name for products
 const PRODUCTS_COLLECTION = 'products';
 
@@ -241,6 +256,74 @@ export class GiftProductService {
     } catch (error) {
       console.error('Error deleting gift product: ', error);
       throw new Error('Failed to delete gift product');
+    }
+  }
+}
+
+// Extended Blog interface for Firestore
+export interface FirestoreBlog extends Omit<Blog, 'id'> {
+  id?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+// Service class for blog operations
+export class BlogService {
+  private static readonly COLLECTION = 'blogs';
+
+  // Add a new blog to Firestore
+  static async addBlog(blogData: Omit<Blog, 'id' | 'firestoreId'>): Promise<string> {
+    try {
+      const blogToAdd: Omit<FirestoreBlog, 'id'> = {
+        ...blogData,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+
+      const docRef = await addDoc(collection(db, this.COLLECTION), blogToAdd);
+      console.log('Blog added with ID: ', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding blog: ', error);
+      throw new Error('Failed to add blog');
+    }
+  }
+
+  // Get all blogs from Firestore
+  static async getAllBlogs(): Promise<Blog[]> {
+    try {
+      const q = query(collection(db, this.COLLECTION), orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      return querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        firestoreId: doc.id,
+        ...doc.data()
+      })) as Blog[];
+    } catch (error) {
+      console.error('Error getting blogs: ', error);
+      throw new Error('Failed to fetch blogs');
+    }
+  }
+
+  // Update a blog in Firestore
+  static async updateBlog(firestoreId: string, blogData: Omit<Blog, 'id' | 'firestoreId'>): Promise<void> {
+    try {
+      const blogRef = doc(db, this.COLLECTION, firestoreId);
+      await updateDoc(blogRef, { ...blogData, updatedAt: Timestamp.now() });
+    } catch (error) {
+      console.error('Error updating blog: ', error);
+      throw new Error('Failed to update blog');
+    }
+  }
+
+  // Delete a blog from Firestore
+  static async deleteBlog(firestoreId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, this.COLLECTION, firestoreId));
+    } catch (error) {
+      console.error('Error deleting blog: ', error);
+      throw new Error('Failed to delete blog');
     }
   }
 }
