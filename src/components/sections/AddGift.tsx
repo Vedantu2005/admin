@@ -1,6 +1,7 @@
-import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
+import React, { useState, useRef, ChangeEvent, useEffect, useCallback, useMemo } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { GiftProduct } from '../Dashboard';
+import { uploadImageToCloudinary, validateImageFile } from '../../firebase/imageService';
 
 interface AddGiftProps {
     onSaveProduct: (productData: Omit<GiftProduct, 'id' | 'status'>, id: number | null) => void;
@@ -14,15 +15,17 @@ interface ProductFaq {
 }
 
 const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
-    const initialFormState = {
+    const initialFormState = useMemo(() => ({
         productName: '',
         category: '',
         mrp: 0,
         contents: '',
-    };
+    }), []);
 
     const [formState, setFormState] = useState(initialFormState);
     const [mainImage, setMainImage] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [imageRemoved, setImageRemoved] = useState(false);
     const [faqs, setFaqs] = useState<ProductFaq[]>([
         { id: Date.now() + 1, question: 'Is gift wrapping available?', answer: 'Yes, all our gift products come with premium gift wrapping.' },
         { id: Date.now() + 2, question: 'Can I add a custom message?', answer: 'Yes, you can add a custom message at the checkout page.'}
@@ -35,6 +38,17 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
 
     const mainImageInputRef = useRef<HTMLInputElement>(null);
 
+    const handleReset = useCallback(() => {
+        setFormState(initialFormState);
+        setMainImage(null);
+        setImageRemoved(false);
+        setFaqs([
+            { id: Date.now() + 1, question: 'Is gift wrapping available?', answer: 'Yes, all our gift products come with premium gift wrapping.' },
+            { id: Date.now() + 2, question: 'Can I add a custom message?', answer: 'Yes, you can add a custom message at the checkout page.'}
+        ]);
+        if (mainImageInputRef.current) mainImageInputRef.current.value = '';
+    }, [initialFormState]);
+
     useEffect(() => {
         if (productToEdit) {
             setFormState({
@@ -43,39 +57,61 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
                 mrp: productToEdit.mrp,
                 contents: productToEdit.contents,
             });
+            setImageRemoved(false);
         } else {
             handleReset();
         }
-    }, [productToEdit]);
+    }, [productToEdit, handleReset]);
 
     const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({...prev, [id]: id === 'mrp' ? parseFloat(value) || 0 : value }));
     };
     
-    const handleReset = () => {
-        setFormState(initialFormState);
-        setMainImage(null);
-        setFaqs([
-            { id: Date.now() + 1, question: 'Is gift wrapping available?', answer: 'Yes, all our gift products come with premium gift wrapping.' },
-            { id: Date.now() + 2, question: 'Can I add a custom message?', answer: 'Yes, you can add a custom message at the checkout page.'}
-        ]);
-        if (mainImageInputRef.current) mainImageInputRef.current.value = '';
-    };
-    
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formState.productName || !formState.category || formState.mrp <= 0) {
             alert('Please fill out Product Name, Category, and MRP.');
             return;
         }
-        const productData = {
-            image: mainImage ? URL.createObjectURL(mainImage) : productToEdit?.image || 'https://via.placeholder.com/40',
-            category: formState.productName,
-            mrp: formState.mrp,
-            contents: formState.contents,
-        };
-        onSaveProduct(productData, productToEdit ? productToEdit.id : null);
-        alert(productToEdit ? 'Gifting Product updated!' : 'Gifting Product added!');
+        
+        setUploading(true);
+        
+        try {
+            let imageUrl = 'https://via.placeholder.com/40'; // Default fallback
+            
+            // If there's a new image selected, upload to Cloudinary
+            if (mainImage) {
+                // Validate the image file
+                const validation = validateImageFile(mainImage);
+                if (!validation.isValid) {
+                    alert(`Image error: ${validation.error}`);
+                    setUploading(false);
+                    return;
+                }
+                
+                // Upload to Cloudinary
+                imageUrl = await uploadImageToCloudinary(mainImage, 'dev-admin/gifts');
+            } else if (productToEdit?.image && !imageRemoved) {
+                // Keep the existing image if not removed
+                imageUrl = productToEdit.image;
+            }
+            
+            const productData = {
+                image: imageUrl,
+                category: formState.productName,
+                mrp: formState.mrp,
+                contents: formState.contents,
+            };
+            
+            onSaveProduct(productData, productToEdit ? productToEdit.id : null);
+            alert(productToEdit ? 'Gifting Product updated!' : 'Gifting Product added!');
+            
+        } catch (error) {
+            console.error('Error saving gift product:', error);
+            alert('Failed to save gift product. Please try again.');
+        } finally {
+            setUploading(false);
+        }
     };
 
     const handleMainImageChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -146,11 +182,38 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
         <div className="bg-white p-6 rounded-lg shadow-sm">
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Upload Product Image</h2>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Main Image</label>
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                Main Image
+                {productToEdit?.image && !mainImage && !imageRemoved && (
+                  <span className="text-xs text-blue-600 ml-2">(Current image shown - click to change)</span>
+                )}
+                {imageRemoved && (
+                  <span className="text-xs text-orange-600 ml-2">(Image removed - click to upload new)</span>
+                )}
+              </label>
               <input type="file" ref={mainImageInputRef} onChange={handleMainImageChange} className="hidden" accept="image/*" />
               <div onClick={() => mainImageInputRef.current?.click()} className="relative group border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center cursor-pointer hover:border-[#703102] transition-colors">
-                {mainImage ? <img src={URL.createObjectURL(mainImage)} alt="Main preview" className="max-h-full max-w-full object-contain" /> : <p className="text-gray-400 text-center">Click to upload main image</p>}
-                {mainImage && <button onClick={(e) => { e.stopPropagation(); setMainImage(null); }} className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove main image">✕</button>}
+                {mainImage ? (
+                  <img src={URL.createObjectURL(mainImage)} alt="Main preview" className="max-h-full max-w-full object-contain" />
+                ) : productToEdit?.image && !imageRemoved ? (
+                  <img src={productToEdit.image} alt="Current product image" className="max-h-full max-w-full object-contain" />
+                ) : (
+                  <p className="text-gray-400 text-center">Click to upload main image</p>
+                )}
+                {(mainImage || (productToEdit?.image && !imageRemoved)) && (
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setMainImage(null);
+                      setImageRemoved(true);
+                      if (mainImageInputRef.current) mainImageInputRef.current.value = '';
+                    }} 
+                    className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" 
+                    aria-label="Remove image"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             </div>
         </div>
@@ -178,10 +241,21 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
         </div>
         
         <div className="flex justify-start space-x-4 mt-6">
-            <button onClick={handleSave} className="px-6 py-2 text-white font-semibold rounded-md transition" style={{ backgroundColor: '#703102' }}>
-                {productToEdit ? 'UPDATE GIFT PRODUCT' : 'ADD GIFT PRODUCT'}
+            <button 
+                onClick={handleSave} 
+                disabled={uploading}
+                className="px-6 py-2 text-white font-semibold rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed" 
+                style={{ backgroundColor: '#703102' }}
+            >
+                {uploading ? 'Uploading...' : (productToEdit ? 'UPDATE GIFT PRODUCT' : 'ADD GIFT PRODUCT')}
             </button>
-            <button type="button" onClick={handleReset} className="px-6 py-2 text-white font-semibold rounded-md transition" style={{ backgroundColor: '#703102' }}>
+            <button 
+                type="button" 
+                onClick={handleReset} 
+                disabled={uploading}
+                className="px-6 py-2 text-white font-semibold rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed" 
+                style={{ backgroundColor: '#703102' }}
+            >
                 RESET
             </button>
         </div>
