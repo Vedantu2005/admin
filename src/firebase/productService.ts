@@ -562,3 +562,112 @@ export class PodcastService {
     }
   }
 }
+
+// Testimonial interface - matches exact UI structure
+export interface Testimonial {
+  id: string;
+  firestoreId?: string;
+  name: string;
+  image: string;
+  location: string;
+  description: string;
+  rating: number;
+  type: 'text' | 'video';
+  videoFile?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+// Firestore Testimonial interface
+export interface FirestoreTestimonial extends Omit<Testimonial, 'id'> {
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// Collection name for testimonials
+const TESTIMONIALS_COLLECTION = 'testimonials';
+
+// Service class for testimonial operations
+export class TestimonialService {
+  // Add a new testimonial to Firestore
+  static async addTestimonial(testimonialData: Omit<Testimonial, 'id' | 'firestoreId' | 'createdAt' | 'updatedAt'>): Promise<string> {
+    try {
+      // Filter out undefined fields to avoid Firestore errors
+      const cleanData = Object.fromEntries(
+        Object.entries(testimonialData).filter(([, value]) => value !== undefined)
+      );
+
+      const testimonialToAdd = {
+        ...cleanData,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+
+      const docRef = await addDoc(collection(db, TESTIMONIALS_COLLECTION), testimonialToAdd);
+      console.log('Testimonial added with ID: ', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding testimonial: ', error);
+      throw new Error('Failed to add testimonial');
+    }
+  }
+
+  // Get all testimonials from Firestore
+  static async getAllTestimonials(): Promise<Testimonial[]> {
+    try {
+      const q = query(collection(db, TESTIMONIALS_COLLECTION), orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      
+      const testimonials: Testimonial[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data() as FirestoreTestimonial;
+        testimonials.push({
+          id: doc.id,
+          firestoreId: doc.id,
+          name: data.name || '',
+          image: data.image || '',
+          location: data.location || '',
+          description: data.description || '',
+          rating: data.rating || 5,
+          type: data.type || 'text',
+          videoFile: data.videoFile || '',
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+        });
+      });
+
+      return testimonials;
+    } catch (error) {
+      console.error('Error getting testimonials: ', error);
+      throw new Error('Failed to fetch testimonials');
+    }
+  }
+
+  // Update an existing testimonial
+  static async updateTestimonial(firestoreId: string, updateData: Partial<Omit<Testimonial, 'id' | 'firestoreId'>>): Promise<void> {
+    try {
+      // Filter out undefined fields to avoid Firestore errors
+      const cleanData = Object.fromEntries(
+        Object.entries(updateData).filter(([, value]) => value !== undefined)
+      );
+
+      const testimonialRef = doc(db, TESTIMONIALS_COLLECTION, firestoreId);
+      await updateDoc(testimonialRef, { ...cleanData, updatedAt: Timestamp.now() });
+      console.log('Testimonial updated successfully');
+    } catch (error) {
+      console.error('Error updating testimonial: ', error);
+      throw new Error('Failed to update testimonial');
+    }
+  }
+
+  // Delete a testimonial
+  static async deleteTestimonial(firestoreId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, TESTIMONIALS_COLLECTION, firestoreId));
+      console.log('Testimonial deleted successfully');
+    } catch (error) {
+      console.error('Error deleting testimonial: ', error);
+      throw new Error('Failed to delete testimonial');
+    }
+  }
+}

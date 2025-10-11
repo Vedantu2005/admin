@@ -1,77 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Star, Play, X } from 'lucide-react';
-
-interface Testimonial {
-  id: string;
-  name: string;
-  image: string;
-  location: string;
-  description: string;
-  rating: number;
-  type: 'text' | 'video';
-  videoFile?: string;
-}
+import { TestimonialService, Testimonial } from '../../firebase/productService';
+import { uploadImageToCloudinary, validateImageFile } from '../../firebase/imageService';
 
 const TestimonialManager: React.FC = () => {
-  const [testimonials, setTestimonials] = useState<Testimonial[]>([
-    {
-      id: '1',
-      name: 'Priya Sharma',
-      image: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=300',
-      location: 'Mumbai, Maharashtra',
-      description: 'The mustard oil from Dev Natural Oils has that authentic taste I remember from my childhood. The quality is exceptional and you can really taste the difference!',
-      rating: 5,
-      type: 'text'
-    },
-    {
-      id: '2',
-      name: 'Rajesh Kumar',
-      image: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=300',
-      location: 'Delhi, NCR',
-      description: 'I have been using their coconut oil for cooking and it’s amazing. Pure, natural, and the aroma is just perfect. Highly recommended for health-conscious families.',
-      rating: 4,
-      type: 'text',
-    },
-    {
-      id: '3',
-      name: 'Meera Patel',
-      image: 'https://images.pexels.com/photos/3763188/pexels-photo-3763188.jpeg?auto=compress&cs=tinysrgb&w=300',
-      location: 'Ahmedabad, Gujarat',
-      description: 'The groundnut oil is excellent for deep frying. It doesn’t break down at high temperatures and gives food a wonderful taste. Great quality at reasonable prices.',
-      rating: 5,
-      type: 'text'
-    },
-    {
-      id: '4',
-      name: 'Priya Sharma',
-      image: 'https://images.pexels.com/photos/415829/pexels-photo-415829.jpeg?auto=compress&cs=tinysrgb&w=300',
-      location: 'Mumbai, Maharashtra',
-      description: 'A video message about the authentic taste of their mustard oil.',
-      rating: 5,
-      type: 'video',
-      videoFile: 'sample-video-1.mp4'
-    },
-    {
-      id: '5',
-      name: 'Rajesh Kumar',
-      image: 'https://images.pexels.com/photos/1043474/pexels-photo-1043474.jpeg?auto=compress&cs=tinysrgb&w=300',
-      location: 'Delhi, NCR',
-      description: 'A video review of their pure and natural coconut oil.',
-      rating: 5,
-      type: 'video',
-      videoFile: 'sample-video-2.mp4'
-    },
-    {
-      id: '6',
-      name: 'Meera Patel',
-      image: 'https://images.pexels.com/photos/3763188/pexels-photo-3763188.jpeg?auto=compress&cs=tinysrgb&w=300',
-      location: 'Ahmedabad, Gujarat',
-      description: 'A video testimonial explaining the benefits of their groundnut oil.',
-      rating: 5,
-      type: 'video',
-      videoFile: 'sample-video-3.mp4'
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+
+  // Load testimonials from Firebase on component mount
+  useEffect(() => {
+    loadTestimonials();
+  }, []);
+
+  const loadTestimonials = async () => {
+    try {
+      setLoading(true);
+      const allTestimonials = await TestimonialService.getAllTestimonials();
+      setTestimonials(allTestimonials);
+    } catch (error) {
+      console.error('Error loading testimonials:', error);
+      alert('Failed to load testimonials');
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
   const initialFormState = {
     name: '',
@@ -87,18 +40,86 @@ const TestimonialManager: React.FC = () => {
   const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null);
   const [formData, setFormData] = useState(initialFormState);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingTestimonial) {
-      setTestimonials(testimonials.map(testimonial =>
-        testimonial.id === editingTestimonial.id
-          ? { ...formData, id: editingTestimonial.id }
-          : testimonial
-      ));
-    } else {
-      setTestimonials([...testimonials, { ...formData, id: Date.now().toString() }]);
+    setUploading(true);
+    
+    try {
+      let imageUrl = formData.image;
+      let videoUrl = formData.videoFile;
+      
+      // Upload image to Cloudinary if it's a file (base64)
+      if (imageUrl && imageUrl.startsWith('data:')) {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], 'testimonial-image.jpg', { type: 'image/jpeg' });
+        
+        const validation = validateImageFile(file);
+        if (!validation.isValid) {
+          alert(`Image error: ${validation.error}`);
+          setUploading(false);
+          return;
+        }
+        
+        // Show warning about compression if file is large
+        if (validation.warning) {
+          console.log(`Image compression: ${validation.warning}`);
+          // You could show a toast notification here if you have a toast system
+        }
+        
+        console.log(`Starting upload for image: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+        imageUrl = await uploadImageToCloudinary(file, 'dev-admin/testimonials');
+        console.log(`Upload successful: ${imageUrl}`);
+      }
+      
+      // Upload video to Cloudinary if it's a file (base64) and type is video
+      if (formData.type === 'video' && videoUrl && videoUrl.startsWith('data:')) {
+        const response = await fetch(videoUrl);
+        const blob = await response.blob();
+        const file = new File([blob], 'testimonial-video.mp4', { type: 'video/mp4' });
+        
+        videoUrl = await uploadImageToCloudinary(file, 'dev-admin/testimonials/videos');
+      }
+      
+      const testimonialData = {
+        name: formData.name,
+        image: imageUrl,
+        location: formData.location,
+        description: formData.description,
+        rating: formData.rating,
+        type: formData.type,
+        ...(formData.type === 'video' && videoUrl ? { videoFile: videoUrl } : {}),
+      };
+      
+      if (editingTestimonial) {
+        await TestimonialService.updateTestimonial(editingTestimonial.firestoreId || editingTestimonial.id, testimonialData);
+        alert('Testimonial updated successfully!');
+      } else {
+        await TestimonialService.addTestimonial(testimonialData);
+        alert('Testimonial added successfully!');
+      }
+      
+      await loadTestimonials();
+      resetForm();
+    } catch (error) {
+      console.error('Error saving testimonial:', error);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to save testimonial. Please try again.';
+      if (error instanceof Error) {
+        if (error.message.includes('File size too large')) {
+          errorMessage = 'Image file is too large even after compression. Please try a smaller image (under 5MB recommended).';
+        } else if (error.message.includes('Cloudinary')) {
+          errorMessage = 'Failed to upload image. Please check your internet connection and try again.';
+        } else if (error.message.includes('Firebase')) {
+          errorMessage = 'Failed to save to database. Please try again.';
+        }
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setUploading(false);
     }
-    resetForm();
   };
 
   const resetForm = () => {
@@ -116,8 +137,17 @@ const TestimonialManager: React.FC = () => {
     });
   };
 
-  const handleDelete = (id: string) => {
-    setTestimonials(testimonials.filter(testimonial => testimonial.id !== id));
+  const handleDelete = async (testimonial: Testimonial) => {
+    if (window.confirm('Are you sure you want to delete this testimonial?')) {
+      try {
+        await TestimonialService.deleteTestimonial(testimonial.firestoreId || testimonial.id);
+        await loadTestimonials();
+        alert('Testimonial deleted successfully!');
+      } catch (error) {
+        console.error('Error deleting testimonial:', error);
+        alert('Failed to delete testimonial. Please try again.');
+      }
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,54 +185,15 @@ const TestimonialManager: React.FC = () => {
   const textTestimonials = testimonials.filter(t => t.type === 'text');
   const videoTestimonials = testimonials.filter(t => t.type === 'video');
 
-  // Reusable Form Component
-  const TestimonialForm = ({ onCancel }: { onCancel: () => void }) => (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-          <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-          <input type="text" value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+  if (loading) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8 bg-gray-50/50 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-lg font-semibold" style={{ color: '#703102' }}>Loading testimonials...</div>
         </div>
       </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Testimonial Type</label>
-        <div className="flex space-x-4">
-          <label className="flex items-center"><input type="radio" value="text" checked={formData.type === 'text'} onChange={(e) => setFormData({ ...formData, type: e.target.value as 'text' | 'video' })} className="mr-2" /> Text</label>
-          <label className="flex items-center"><input type="radio" value="video" checked={formData.type === 'video'} onChange={(e) => setFormData({ ...formData, type: e.target.value as 'text' | 'video' })} className="mr-2" /> Video</label>
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Upload Image</label>
-        <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100" />
-        {formData.image && <img src={formData.image} alt="Preview" className="mt-2 w-24 h-24 object-cover rounded-full" />}
-      </div>
-      {formData.type === 'video' && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Upload Video</label>
-          <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
-          {formData.videoFile && <video src={formData.videoFile} className="mt-2 w-64 h-36 object-cover rounded-lg" controls />}
-        </div>
-      )}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
-        <select value={formData.rating} onChange={(e) => setFormData({ ...formData, rating: parseInt(e.target.value) })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required >
-          {[1, 2, 3, 4, 5].map(rating => <option key={rating} value={rating}>{rating} Star{rating > 1 ? 's' : ''}</option>)}
-        </select>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-        <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={4} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
-      </div>
-      <div className="flex space-x-3">
-        <button type="submit" className="px-6 py-2 rounded-lg text-white transition-colors" style={{ backgroundColor: '#499E47' }}>{editingTestimonial ? 'Update' : 'Create'} Testimonial</button>
-        <button type="button" onClick={onCancel} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
-      </div>
-    </form>
-  );
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gray-50/50 min-h-screen">
@@ -222,7 +213,66 @@ const TestimonialManager: React.FC = () => {
       {isAddFormOpen && (
         <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4" style={{ color: '#703102' }}>Add New Testimonial</h2>
-          <TestimonialForm onCancel={resetForm} />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                <input type="text" value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Testimonial Type</label>
+              <div className="flex space-x-4">
+                <label className="flex items-center"><input type="radio" value="text" checked={formData.type === 'text'} onChange={(e) => setFormData({ ...formData, type: e.target.value as 'text' | 'video' })} className="mr-2" /> Text</label>
+                <label className="flex items-center"><input type="radio" value="video" checked={formData.type === 'video'} onChange={(e) => setFormData({ ...formData, type: e.target.value as 'text' | 'video' })} className="mr-2" /> Video</label>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Upload Image</label>
+              <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100" />
+              {formData.image && <img src={formData.image} alt="Preview" className="mt-2 w-24 h-24 object-cover rounded-full" />}
+            </div>
+            {formData.type === 'video' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Upload Video</label>
+                <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
+                {formData.videoFile && <video src={formData.videoFile} className="mt-2 w-64 h-36 object-cover rounded-lg" controls />}
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
+              <select value={formData.rating} onChange={(e) => setFormData({ ...formData, rating: parseInt(e.target.value) })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required >
+                {[1, 2, 3, 4, 5].map(rating => <option key={rating} value={rating}>{rating} Star{rating > 1 ? 's' : ''}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={4} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+            </div>
+            <div className="flex space-x-3">
+              <button 
+                type="submit" 
+                disabled={uploading}
+                className="px-6 py-2 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                style={{ backgroundColor: uploading ? '#6b7280' : '#499E47' }}
+              >
+                {uploading ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Uploading & Saving...
+                  </span>
+                ) : 'Create Testimonial'}
+              </button>
+              <button type="button" onClick={resetForm} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -232,7 +282,66 @@ const TestimonialManager: React.FC = () => {
           <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto relative">
             <button onClick={resetForm} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={24} /></button>
             <h2 className="text-xl font-semibold mb-4" style={{ color: '#703102' }}>Edit Testimonial</h2>
-            <TestimonialForm onCancel={resetForm} />
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                  <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                  <input type="text" value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Testimonial Type</label>
+                <div className="flex space-x-4">
+                  <label className="flex items-center"><input type="radio" value="text" checked={formData.type === 'text'} onChange={(e) => setFormData({ ...formData, type: e.target.value as 'text' | 'video' })} className="mr-2" /> Text</label>
+                  <label className="flex items-center"><input type="radio" value="video" checked={formData.type === 'video'} onChange={(e) => setFormData({ ...formData, type: e.target.value as 'text' | 'video' })} className="mr-2" /> Video</label>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Upload Image</label>
+                <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100" />
+                {formData.image && <img src={formData.image} alt="Preview" className="mt-2 w-24 h-24 object-cover rounded-full" />}
+              </div>
+              {formData.type === 'video' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Upload Video</label>
+                  <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
+                  {formData.videoFile && <video src={formData.videoFile} className="mt-2 w-64 h-36 object-cover rounded-lg" controls />}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
+                <select value={formData.rating} onChange={(e) => setFormData({ ...formData, rating: parseInt(e.target.value) })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required >
+                  {[1, 2, 3, 4, 5].map(rating => <option key={rating} value={rating}>{rating} Star{rating > 1 ? 's' : ''}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={4} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+              </div>
+              <div className="flex space-x-3">
+                <button 
+                  type="submit" 
+                  disabled={uploading}
+                  className="px-6 py-2 rounded-lg text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                  style={{ backgroundColor: uploading ? '#6b7280' : '#499E47' }}
+                >
+                  {uploading ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Updating & Saving...
+                    </span>
+                  ) : 'Update Testimonial'}
+                </button>
+                <button type="button" onClick={resetForm} className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -255,7 +364,7 @@ const TestimonialManager: React.FC = () => {
               <p className="text-gray-600 italic">"{testimonial.description}"</p>
               <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-2">
                 <button onClick={() => handleEdit(testimonial)} className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600"><Edit2 size={14} /></button>
-                <button onClick={() => handleDelete(testimonial.id)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600"><Trash2 size={14} /></button>
+                <button onClick={() => handleDelete(testimonial)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600"><Trash2 size={14} /></button>
               </div>
             </div>
           ))}
@@ -274,7 +383,7 @@ const TestimonialManager: React.FC = () => {
                 </div>
                 <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-2">
                   <button onClick={() => handleEdit(testimonial)} className="p-2 bg-blue-500 text-white rounded-full hover:bg-blue-600"><Edit2 size={14} /></button>
-                  <button onClick={() => handleDelete(testimonial.id)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600"><Trash2 size={14} /></button>
+                  <button onClick={() => handleDelete(testimonial)} className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600"><Trash2 size={14} /></button>
                 </div>
               </div>
               <div className="p-6">

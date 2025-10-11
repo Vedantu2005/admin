@@ -15,18 +15,194 @@ interface CloudinaryUploadResponse {
   created_at: string;
 }
 
-// Upload a single image to Cloudinary
+// Compress image if it's too large
+const compressImage = (file: File, maxSizeInBytes = 5 * 1024 * 1024): Promise<File> => {
+  return new Promise((resolve) => {
+    console.log(`compressImage called for file: ${file.name}, size: ${(file.size / 1024 / 1024).toFixed(2)}MB, threshold: ${(maxSizeInBytes / 1024 / 1024).toFixed(2)}MB`);
+    
+    // If file is already small enough, return it as is
+    if (file.size <= maxSizeInBytes) {
+      console.log(`File is already small enough, returning original`);
+      resolve(file);
+      return;
+    }
+
+    console.log(`File needs compression, starting process...`);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    console.log(`Starting compression for file: ${file.name}, size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+    
+    if (!ctx) {
+      console.error('Failed to get 2D context, returning original file');
+      resolve(file);
+      return;
+    }
+
+    // Create object URL first
+    const objectUrl = URL.createObjectURL(file);
+    console.log(`Created object URL for ${file.type} file`);
+
+    img.onload = () => {
+      console.log('Image loaded successfully');
+      URL.revokeObjectURL(objectUrl); // Clean up memory
+      
+      const { width, height } = img;
+      console.log(`Original dimensions: ${width}x${height}`);
+      
+      // Check if context is valid
+      if (!ctx) {
+        console.error('Canvas context is null, returning original file');
+        resolve(file);
+        return;
+      }
+      
+      // Calculate compression ratio based on file size
+      // Target final size of 8MB maximum to stay well under Cloudinary's 10MB limit
+      const targetSize = 8 * 1024 * 1024; // 8MB target
+      let compressionRatio = Math.sqrt(targetSize / file.size);
+      
+      // More aggressive compression for very large files
+      if (file.size > 20 * 1024 * 1024) {
+        compressionRatio = Math.min(compressionRatio, 0.3); // Max 30% of original size
+      } else if (file.size > 15 * 1024 * 1024) {
+        compressionRatio = Math.min(compressionRatio, 0.4); // Max 40% of original size
+      } else if (file.size > 10 * 1024 * 1024) {
+        compressionRatio = Math.min(compressionRatio, 0.5); // Max 50% of original size
+      } else {
+        compressionRatio = Math.min(compressionRatio, 0.7); // Max 70% of original size
+      }
+      
+      // Apply compression ratio to dimensions
+      const newWidth = Math.floor(width * compressionRatio);
+      const newHeight = Math.floor(height * compressionRatio);
+      
+      console.log(`Compressed dimensions: ${newWidth}x${newHeight} (ratio: ${compressionRatio.toFixed(2)})`);
+
+      canvas.width = newWidth;
+      canvas.height = newHeight;
+
+      // Set better rendering options
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      // Clear canvas and draw image
+      ctx.clearRect(0, 0, newWidth, newHeight);
+      ctx.drawImage(img, 0, 0, newWidth, newHeight);
+      
+      // Try different quality levels
+      const attemptCompression = (quality: number, attempt: number = 1): void => {
+        console.log(`Starting compression attempt ${attempt} with quality ${quality}`);
+        
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              // Ensure filename has .jpg extension
+              const newName = file.name.replace(/\.[^/.]+$/, ".jpg");
+              const compressedFile = new File([blob], newName, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              
+              console.log(`Compression attempt ${attempt}, quality ${quality}: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+              
+              // If still too large and we can try lower quality
+              if (compressedFile.size > targetSize && quality > 0.1 && attempt < 8) {
+                attemptCompression(quality - 0.1, attempt + 1);
+              } else {
+                console.log(`Final compressed file: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+                resolve(compressedFile);
+              }
+            } else {
+              console.error('Blob creation failed, returning original file');
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      
+      // Start with aggressive quality based on file size
+      let startingQuality: number;
+      if (file.size > 15 * 1024 * 1024) {
+        startingQuality = 0.3; // Very aggressive for large files
+      } else if (file.size > 10 * 1024 * 1024) {
+        startingQuality = 0.4;
+      } else if (file.size > 8 * 1024 * 1024) {
+        startingQuality = 0.5;
+      } else {
+        startingQuality = 0.6;
+      }
+      
+      console.log(`Starting compression with quality ${startingQuality} for ${(file.size / 1024 / 1024).toFixed(2)}MB file`);
+      attemptCompression(startingQuality);
+    };
+
+    img.onerror = (error) => {
+      console.error('Image load failed:', error);
+      console.error('File type:', file.type);
+      console.error('File size:', file.size);
+      URL.revokeObjectURL(objectUrl); // Clean up memory
+      resolve(file);
+    };
+    
+    // Set the source to start loading
+    img.src = objectUrl;
+  });
+};
+
+// Upload a file (image or video) to Cloudinary
 export const uploadImageToCloudinary = async (file: File, folder = 'dev-admin/products'): Promise<string> => {
   try {
+    // Determine if this is an image or video
+    const isVideo = file.type.startsWith('video/');
+    const isImage = file.type.startsWith('image/');
+    
+    console.log(`Uploading file: ${file.name}, type: ${file.type}, size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+    
+    let processedFile = file;
+    
+    // Only compress images, not videos
+    if (isImage) {
+      processedFile = await compressImage(file);
+      console.log(`Original file size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      console.log(`Compressed file size: ${(processedFile.size / 1024 / 1024).toFixed(2)}MB`);
+    } else if (isVideo) {
+      console.log(`Video file detected, skipping compression`);
+      console.log(`Video file size: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+      
+      // Check if video file is too large (Cloudinary free tier has a 100MB limit for videos)
+      const maxVideoSize = 100 * 1024 * 1024; // 100MB
+      if (file.size > maxVideoSize) {
+        throw new Error(`Video file is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Maximum allowed size is 100MB.`);
+      }
+    } else {
+      throw new Error(`Unsupported file type: ${file.type}`);
+    }
+    
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', processedFile);
     formData.append('upload_preset', cloudinaryConfig.upload_preset);
     formData.append('folder', folder);
     
-    // Note: Transformations must be configured in the upload preset for unsigned uploads
-    // Remove transformation parameter as it's not allowed for unsigned uploads
+    // Set resource type based on file type
+    if (isVideo) {
+      formData.append('resource_type', 'video');
+    }
 
-    const response = await fetch(cloudinaryUrl, {
+    // Use appropriate Cloudinary endpoint based on file type
+    let uploadUrl: string;
+    if (isVideo) {
+      uploadUrl = `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloud_name}/video/upload`;
+    } else {
+      uploadUrl = cloudinaryUrl; // Uses the image upload endpoint
+    }
+    
+    console.log(`Using upload endpoint: ${uploadUrl}`);
+
+    const response = await fetch(uploadUrl, {
       method: 'POST',
       body: formData,
     });
@@ -145,7 +321,7 @@ export const getOptimizedImageUrl = (
 };
 
 // Validate image file
-export const validateImageFile = (file: File): { isValid: boolean; error?: string } => {
+export const validateImageFile = (file: File): { isValid: boolean; error?: string; warning?: string } => {
   // Check file type
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
   if (!allowedTypes.includes(file.type)) {
@@ -155,12 +331,21 @@ export const validateImageFile = (file: File): { isValid: boolean; error?: strin
     };
   }
 
-  // Check file size (10MB limit)
-  const maxSize = 10 * 1024 * 1024; // 10MB in bytes
+  // Check file size (50MB absolute limit)
+  const maxSize = 50 * 1024 * 1024; // 50MB in bytes (absolute maximum)
   if (file.size > maxSize) {
     return {
       isValid: false,
-      error: 'Image size should be less than 10MB'
+      error: 'Image size should be less than 50MB'
+    };
+  }
+
+  // Warn about compression for files over 10MB
+  const compressionThreshold = 10 * 1024 * 1024; // 10MB
+  if (file.size > compressionThreshold) {
+    return { 
+      isValid: true, 
+      warning: `Large file detected (${(file.size / 1024 / 1024).toFixed(1)}MB). Image will be automatically compressed for faster upload.`
     };
   }
 
