@@ -26,7 +26,10 @@ if (missingFields.length > 0) {
 
 const app = initializeApp(firebaseConfig);
 
-
 export const db = getFirestore(app);
+
+// Test database connection
+console.log('🔥 Firebase initialized with project:', firebaseConfig.projectId);
+console.log('🔧 Database instance created:', !!db);
 
 export default app;

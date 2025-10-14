@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { ProductService, ComboProductService, GiftProductService } from '../firebase/productService';
-import CloudinaryDebugger from './CloudinaryDebugger';
 
 // Import your actual components
 import BlogManager from './sections/BlogManager';
@@ -349,7 +348,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       case 'bulk-order': return <BulkOrderManager />;
       case 'contact': return <ContactManager />;
       case 'faq': return <FaqManager />;
-      case 'cloudinary-debug': return <CloudinaryDebugger />;
       case 'product-add': return <AddProduct onSaveProduct={handleSaveProduct} productToEdit={productToEdit} />;
       case 'product-list': return <ProductList products={products} onDeleteProduct={handleDeleteProduct} onNavigateToAddProduct={handleNavigateToAddProduct} onEditProduct={handleEditProduct} />;
       case 'product-add-combo': return <AddComboProduct onSaveProduct={handleSaveComboProduct} productToEdit={comboProductToEdit} />;
