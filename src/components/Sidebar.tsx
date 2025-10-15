@@ -15,6 +15,8 @@ import {
   Gift,
   Award,
   Box,
+  Home,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -26,11 +28,15 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLogout }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isProductOpen, setIsProductOpen] = useState(false);
+  const [isHomeOpen, setIsHomeOpen] = useState(false);
 
   // This hook opens the product dropdown if the active section is a product sub-item.
   useEffect(() => {
     if (activeSection.startsWith('product-')) {
       setIsProductOpen(true);
+    }
+    if (activeSection === 'banners' || activeSection === 'faq' || activeSection === 'testimonials') {
+      setIsHomeOpen(true);
     }
   }, [activeSection]);
 
@@ -41,10 +47,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
   
   const menuItemsAfterProduct = [
     { id: 'podcast', label: 'Podcast', icon: Mic },
-    { id: 'testimonials', label: 'Testimonials', icon: Star },
     { id: 'bulk-order', label: 'Bulk Order', icon: ShoppingCart },
     { id: 'contact', label: 'Contact', icon: MessageCircle },
-    { id: 'faq', label: 'FAQ', icon: HelpCircle },
+  ];
+
+  const homeSubItems = [
+    { id: 'banners', label: 'Banner Manager', icon: ImageIcon },
+    { id: 'faq', label: 'FAQ Manager', icon: HelpCircle },
+    { id: 'testimonials', label: 'Testimonials', icon: Star },
   ];
 
   const productSubItems = [
@@ -59,6 +69,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
   ];
 
   const isProductActive = activeSection.startsWith('product-');
+  const isHomeActive = activeSection === 'banners' || activeSection === 'faq' || activeSection === 'testimonials';
 
   // Helper function to render menu buttons to avoid repetition
   const renderMenuItem = (item: { id: string; label: string; icon: React.ElementType }) => {
@@ -106,6 +117,59 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
       {/* Navigation */}
       <nav className="flex-1 p-2 sm:p-4 space-y-2 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         
+        {/* Home Dropdown Section */}
+        <div>
+          <button
+            onClick={() => {
+              if (isCollapsed) {
+                setIsCollapsed(false);
+                setIsHomeOpen(true);
+              } else {
+                setIsHomeOpen(!isHomeOpen);
+              }
+            }}
+            className={`w-full flex items-center p-3 rounded-lg transition-all ${isCollapsed ? 'justify-center' : 'justify-between'} ${
+              isHomeActive
+                ? 'text-amber-900 shadow-lg'
+                : 'text-amber-100 hover:bg-amber-700 hover:text-white'
+            }`}
+            style={{ backgroundColor: isHomeActive ? '#FCE289' : 'transparent' }}
+            title="Home"
+          >
+            <div className={`flex items-center ${isCollapsed ? '' : 'space-x-3'}`}>
+              <Home size={20} />
+              {!isCollapsed && <span className="font-medium">Home</span>}
+            </div>
+            {!isCollapsed && (
+              isHomeOpen ? <Minus size={20} /> : <Plus size={20} />
+            )}
+          </button>
+
+          {/* Home Sub-menu */}
+          {!isCollapsed && isHomeOpen && (
+            <div className="pl-6 pt-2 space-y-1">
+              {homeSubItems.map(subItem => {
+                const SubIcon = subItem.icon;
+                const isSubItemActive = activeSection === subItem.id;
+                return (
+                  <button
+                    key={subItem.id}
+                    onClick={() => onSectionChange(subItem.id)}
+                    className={`w-full text-left text-sm flex items-center space-x-3 p-2 rounded-md transition-all ${
+                      isSubItemActive
+                        ? 'font-bold text-amber-900 bg-amber-200/50'
+                        : 'text-amber-100 hover:bg-amber-700/50'
+                    }`}
+                  >
+                    <SubIcon size={16} />
+                    <span>{subItem.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Render items before Product */}
         {menuItemsBeforeProduct.map(renderMenuItem)}
 

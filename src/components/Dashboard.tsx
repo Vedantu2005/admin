@@ -3,6 +3,7 @@ import Sidebar from './Sidebar';
 import { ProductService, ComboProductService, GiftProductService } from '../firebase/productService';
 
 // Import your actual components
+import BannerManager from './sections/BannerManager';
 import BlogManager from './sections/BlogManager';
 import PodcastManager from './sections/PodcastManager';
 import TestimonialManager from './sections/TestimonialManager';
@@ -85,7 +86,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
-  const [activeSection, setActiveSection] = useState('blog');
+  const [activeSection, setActiveSection] = useState('banners');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -342,12 +343,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     }
 
     switch (activeSection) {
+      case 'banners': return <BannerManager />;
+      case 'faq': return <FaqManager />;
+      case 'testimonials': return <TestimonialManager />;
       case 'blog': return <BlogManager />;
       case 'podcast': return <PodcastManager />;
-      case 'testimonials': return <TestimonialManager />;
       case 'bulk-order': return <BulkOrderManager />;
       case 'contact': return <ContactManager />;
-      case 'faq': return <FaqManager />;
       case 'product-add': return <AddProduct onSaveProduct={handleSaveProduct} productToEdit={productToEdit} />;
       case 'product-list': return <ProductList products={products} onDeleteProduct={handleDeleteProduct} onNavigateToAddProduct={handleNavigateToAddProduct} onEditProduct={handleEditProduct} />;
       case 'product-add-combo': return <AddComboProduct onSaveProduct={handleSaveComboProduct} productToEdit={comboProductToEdit} />;
