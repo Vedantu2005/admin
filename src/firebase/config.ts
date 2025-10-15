@@ -28,8 +28,13 @@ const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
 
-// Test database connection
-console.log('🔥 Firebase initialized with project:', firebaseConfig.projectId);
-console.log('🔧 Database instance created:', !!db);
+// Test database connection and log any initialization errors
+try {
+    console.log('🔥 Firebase initialized with project:', firebaseConfig.projectId);
+    console.log('🔧 Database instance created:', !!db);
+    console.log('🌐 Database app:', db.app.name);
+} catch (error) {
+    console.error('❌ Firebase initialization error:', error);
+}
 
 export default app;
