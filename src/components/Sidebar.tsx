@@ -40,12 +40,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
     }
   }, [activeSection]);
 
-  // Menu items split to maintain the requested order around the Product dropdown
-  const menuItemsBeforeProduct = [
-    { id: 'blog', label: 'Blog', icon: FileText },
+  // Menu items split to maintain the requested order: Home → Product → Blog → Podcast → Bulk Order
+  const menuItemsBeforeProduct: { id: string; label: string; icon: React.ElementType }[] = [
+    // No items before Product (Home comes first as dropdown, then Product)
   ];
   
   const menuItemsAfterProduct = [
+    { id: 'blog', label: 'Blog', icon: FileText },
     { id: 'podcast', label: 'Podcast', icon: Mic },
     { id: 'bulk-order', label: 'Bulk Order', icon: ShoppingCart },
     { id: 'contact', label: 'Contact', icon: MessageCircle },
