@@ -1,3 +1,38 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Remove all focus outlines and borders */
+@layer base {
+  /* Remove default outline for all focusable elements */
+  *:focus {
+    outline: none !important;
+  }
+  
+  /* Remove focus styles completely for input fields */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none !important;
+    box-shadow: none !important; /* Remove any glow effect */
+  }
+  
+  /* Override all Tailwind focus ring classes to have no effect */
+  [class*="focus:ring"]:focus {
+    --tw-ring-color: transparent !important;
+    --tw-ring-opacity: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  /* Keep the original border color on focus (no change) */
+  input:focus,
+  textarea:focus,
+  select:focus {
+    border-color: inherit !important; /* Keep the original border color */
+  }
+  
+  /* Override focus border classes to not change border color */
+  [class*="focus:border"]:focus {
+    border-color: inherit !important;
+  }
+}
