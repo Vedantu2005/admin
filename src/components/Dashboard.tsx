@@ -18,6 +18,7 @@ import AddGift from './sections/AddGift';
 import GiftList from './sections/GiftList';
 import BestSeller from './sections/BestSeller';
 import ProductOfTheDay from './sections/ProductOfTheDay';
+import Slider from './sections/Slider';
 
 // --- Product Data and Type Definitions ---
 export interface ProductVariant {
@@ -358,6 +359,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       case 'banners': return <BannerManager />;
       case 'faq': return <FaqManager />;
       case 'testimonials': return <TestimonialManager />;
+      case 'slider': return <Slider />;
       case 'blog': return <BlogManager />;
       case 'podcast': return <PodcastManager />;
       case 'bulk-order': return <BulkOrderManager />;

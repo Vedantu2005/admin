@@ -17,6 +17,7 @@ import {
   Box,
   Home,
   Image as ImageIcon,
+  Menu,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -56,6 +57,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
     { id: 'banners', label: 'Banner Manager', icon: ImageIcon },
     { id: 'faq', label: 'FAQ Manager', icon: HelpCircle },
     { id: 'testimonials', label: 'Testimonials', icon: Star },
+    { id: 'slider', label: 'Slider', icon: Menu },
   ];
 
   const productSubItems = [
@@ -70,7 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
   ];
 
   const isProductActive = activeSection.startsWith('product-');
-  const isHomeActive = activeSection === 'banners' || activeSection === 'faq' || activeSection === 'testimonials';
+  const isHomeActive = activeSection === 'banners' || activeSection === 'faq' || activeSection === 'testimonials' || activeSection === 'slider';
 
   // Helper function to render menu buttons to avoid repetition
   const renderMenuItem = (item: { id: string; label: string; icon: React.ElementType }) => {
