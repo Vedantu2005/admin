@@ -7,14 +7,40 @@ import { Trash2, Upload, Image as ImageIcon } from 'lucide-react';
 interface Banner {
   id: string;
   imageUrl: string;
+  type: 'desktop' | 'tablet' | 'mobile';
+  dimensions: string;
   createdAt: Date;
 }
+
+// Banner dimension requirements
+const BANNER_SPECS = {
+  desktop: {
+    width: 1920,
+    height: 600,
+    label: 'Desktop Banner',
+    description: '1920 × 600 px'
+  },
+  tablet: {
+    width: 1024,
+    height: 500,
+    label: 'Tablet Banner',
+    description: '1024 × 500 px'
+  },
+  mobile: {
+    width: 768,
+    minHeight: 320,
+    maxHeight: 400,
+    label: 'Mobile Banner',
+    description: '768 × 320-400 px'
+  }
+} as const;
 
 const BannerManager: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [imageValidation, setImageValidation] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBanners();
@@ -27,7 +53,9 @@ const BannerManager: React.FC = () => {
       const bannersData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date()
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        type: doc.data().type || 'desktop', // Default to desktop for existing banners
+        dimensions: doc.data().dimensions || 'Unknown'
       })) as Banner[];
       setBanners(bannersData);
     } catch (error) {
@@ -37,20 +65,84 @@ const BannerManager: React.FC = () => {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Function to validate image dimensions
+  const validateImageDimensions = (file: File, bannerType: 'desktop' | 'tablet' | 'mobile'): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const { width, height } = img;
+        const spec = BANNER_SPECS[bannerType];
+        
+        let isValid = false;
+        let errorMessage = '';
+        
+        if (bannerType === 'desktop') {
+          const desktopSpec = spec as { width: number; height: number; label: string; description: string };
+          isValid = width === desktopSpec.width && height === desktopSpec.height;
+          if (!isValid) {
+            errorMessage = `Desktop banner must be ${desktopSpec.width} × ${desktopSpec.height} pixels. Your image is ${width} × ${height} pixels.`;
+          }
+        } else if (bannerType === 'tablet') {
+          const tabletSpec = spec as { width: number; height: number; label: string; description: string };
+          isValid = width === tabletSpec.width && height === tabletSpec.height;
+          if (!isValid) {
+            errorMessage = `Tablet banner must be ${tabletSpec.width} × ${tabletSpec.height} pixels. Your image is ${width} × ${height} pixels.`;
+          }
+        } else if (bannerType === 'mobile') {
+          const mobileSpec = spec as { width: number; minHeight: number; maxHeight: number; label: string; description: string };
+          isValid = width === mobileSpec.width && height >= mobileSpec.minHeight && height <= mobileSpec.maxHeight;
+          if (!isValid) {
+            errorMessage = `Mobile banner must be ${mobileSpec.width} × ${mobileSpec.minHeight}-${mobileSpec.maxHeight} pixels. Your image is ${width} × ${height} pixels.`;
+          }
+        }
+        
+        if (!isValid) {
+          setImageValidation(errorMessage);
+        } else {
+          setImageValidation(null);
+        }
+        
+        resolve(isValid);
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setImageValidation('Invalid image file');
+        resolve(false);
+      };
+      
+      img.src = url;
+    });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.type.startsWith('image/')) {
-        setSelectedFile(file);
-      } else {
-        alert('Please select an image file');
-      }
+    if (!file) return;
+
+    // Clear previous validation error
+    setImageValidation(null);
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setImageValidation('Please select an image file');
+      return;
     }
+
+    // Validate image dimensions (always desktop size)
+    const isValidDimensions = await validateImageDimensions(file, 'desktop');
+    if (!isValidDimensions) {
+      return; // Error message is set in validation function
+    }
+
+    setSelectedFile(file);
   };
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      alert('Please select an image file');
+      setImageValidation('Please select an image file');
       return;
     }
 
@@ -59,14 +151,29 @@ const BannerManager: React.FC = () => {
       // Upload image to Cloudinary
       const imageUrl = await uploadImageToCloudinary(selectedFile, 'dev-admin/banners');
       
-      // Save only the image URL to Firestore
+      // Get image dimensions
+      const img = new Image();
+      const imagePromise = new Promise<{width: number, height: number}>((resolve) => {
+        img.onload = () => resolve({width: img.width, height: img.height});
+        img.src = URL.createObjectURL(selectedFile);
+      });
+      const dimensions = await imagePromise;
+      
+      // Save banner data to Firestore (always desktop type)
       await addDoc(collection(db, 'banners'), {
         imageUrl,
+        type: 'desktop',
+        dimensions: `${dimensions.width} × ${dimensions.height}`,
         createdAt: new Date()
       });
 
+      // Reset form
       setSelectedFile(null);
+      setImageValidation(null);
+      
+      // Refresh banners list
       fetchBanners();
+      
       alert('Banner uploaded successfully!');
       
       // Reset file input
@@ -115,11 +222,17 @@ const BannerManager: React.FC = () => {
       {/* Upload Section */}
       <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Upload New Banner</h2>
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
+          <p className="text-sm text-blue-800">
+            <strong>Banner Requirements:</strong> Images must be exactly 1920 × 600 pixels for desktop display.
+          </p>
+        </div>
         
         <div className="space-y-4">
+          {/* File Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Banner Image
+              Select Banner Image <span className="text-red-500">*</span>
             </label>
             <input
               id="bannerFile"
@@ -128,12 +241,21 @@ const BannerManager: React.FC = () => {
               onChange={handleFileSelect}
               className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
             />
-            {selectedFile && (
-              <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                <p className="text-sm text-gray-600">
-                  <strong>Selected:</strong> {selectedFile.name}
+            
+            {/* Image Validation Error */}
+            {imageValidation && (
+              <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600">{imageValidation}</p>
+              </div>
+            )}
+            
+            {/* Selected File Info */}
+            {selectedFile && !imageValidation && (
+              <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm text-green-600">
+                  <strong>✓ Valid:</strong> {selectedFile.name}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-green-500">
                   Size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                 </p>
               </div>
@@ -142,7 +264,7 @@ const BannerManager: React.FC = () => {
 
           <button
             onClick={handleUpload}
-            disabled={!selectedFile || uploading}
+            disabled={!selectedFile || uploading || imageValidation !== null}
             className="bg-amber-600 text-white px-6 py-3 rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {uploading ? (
@@ -193,6 +315,9 @@ const BannerManager: React.FC = () => {
                   
                   {/* Image info */}
                   <div className="p-3">
+                    <p className="text-xs text-gray-600 mb-1">
+                      <strong>Dimensions:</strong> {banner.dimensions || 'Unknown'}
+                    </p>
                     <p className="text-xs text-gray-500">
                       Uploaded: {banner.createdAt.toLocaleDateString()}
                     </p>
