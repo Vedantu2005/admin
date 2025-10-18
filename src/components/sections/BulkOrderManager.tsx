@@ -1,131 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { fetchBulkOrders, BulkOrder } from '../../firebase/bulkOrderService';
 import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
 
-interface BulkOrder {
-  id: string;
-  firstName: string;
-  email: string;
-  mobileNo: string;
-  state: string;
-  productName: string;
-  companyName: string;
-  message: string;
-}
 
 const BulkOrderManager: React.FC = () => {
-  // Sample data with Indian details (now 11 entries)
-  const [bulkOrders] = useState<BulkOrder[]>([
-    {
-      id: '1',
-      firstName: 'Aditya Sharma',
-      email: 'aditya.sharma@example.com',
-      mobileNo: '+91 9876543210',
-      state: 'Maharashtra',
-      productName: 'Widget Pro',
-      companyName: 'Sharma Enterprises',
-      message: 'Need 1000 units for our Diwali sales campaign.'
-    },
-    {
-      id: '2',
-      firstName: 'Priya Patel',
-      email: 'priya.p@company.co.in',
-      mobileNo: '+91 8765432109',
-      state: 'Gujarat',
-      productName: 'Super Widget',
-      companyName: 'Patel Traders',
-      message: 'Bulk order for annual inventory for our Ahmedabad branch.'
-    },
-    {
-      id: '3',
-      firstName: 'Rahul Kumar',
-      email: 'rahul.k@techsolutions.in',
-      mobileNo: '+91 7654321098',
-      state: 'Delhi',
-      productName: 'Premium Package',
-      companyName: 'Kumar Solutions Pvt. Ltd.',
-      message: 'Looking for enterprise-level bulk pricing for 500+ units. Need delivery by end of March.'
-    },
-    {
-      id: '4',
-      firstName: 'Anjali Singh',
-      email: 'anjali@innovate.in',
-      mobileNo: '+91 9123456789',
-      state: 'Karnataka',
-      productName: 'Starter Kit',
-      companyName: 'Innovate India',
-      message: 'Interested in a bulk purchase for our new office setup in Bengaluru. Please provide volume discounts.'
-    },
-    {
-      id: '5',
-      firstName: 'Vikram Reddy',
-      email: 'vikram@globaltech.co.in',
-      mobileNo: '+91 8987654321',
-      state: 'Telangana',
-      productName: 'Professional Suite',
-      companyName: 'Global Tech Hyderabad',
-      message: 'Need 750 units for Q3 rollout across multiple locations. Urgent requirement for our Hyderabad office.'
-    },
-    {
-      id: '6',
-      firstName: 'Sneha Gupta',
-      email: 'sneha@startup.com',
-      mobileNo: '+91 7890123456',
-      state: 'Uttar Pradesh',
-      productName: 'Basic Package',
-      companyName: 'Startup Ventures India',
-      message: 'We are a small startup from Lucknow looking for affordable bulk options. '
-    },
-    {
-      id: '7',
-      firstName: 'Kavita Iyer',
-      email: 'k.iyer@corp.net',
-      mobileNo: '+91 9988776655',
-      state: 'Tamil Nadu',
-      productName: 'Eco-Friendly Bags',
-      companyName: 'Iyer & Sons',
-      message: 'Requesting a quote for 10,000 eco-friendly bags for a state-wide event in Chennai.'
-    },
-    {
-      id: '8',
-      firstName: 'Sandeep Menon',
-      email: 'sandeep.m@keralaexports.com',
-      mobileNo: '+91 8877665544',
-      state: 'Kerala',
-      productName: 'Spices Combo Pack',
-      companyName: 'Kerala Exports',
-      message: 'Need to ship 500 spice combo packs to our international client from Kochi.'
-    },
-    {
-      id: '9',
-      firstName: 'Pooja Desai',
-      email: 'pooja.desai@hospitality.com',
-      mobileNo: '+91 7766554433',
-      state: 'Goa',
-      productName: 'Hotel Amenity Kits',
-      companyName: 'Desai Hospitality',
-      message: 'Bulk order for amenity kits for our chain of hotels in Goa.'
-    },
-    {
-      id: '10',
-      firstName: 'Rajesh Singhaniya',
-      email: 'rajesh@singhaniya.com',
-      mobileNo: '+91 9000011111',
-      state: 'Rajasthan',
-      productName: 'Handcrafted Textiles',
-      companyName: 'Singhaniya Textiles',
-      message: 'We need a large order of handcrafted textiles for our Jaipur store.'
-    },
-    {
-      id: '11',
-      firstName: 'Amitabh Ghosh',
-      email: 'a.ghosh@books.co.in',
-      mobileNo: '+91 8112233445',
-      state: 'West Bengal',
-      productName: 'Bestseller Book Set',
-      companyName: 'Kolkata Book House',
-      message: 'Order for 500 sets of the new bestseller for distribution across Kolkata.'
-    }
-  ]);
+  const [bulkOrders, setBulkOrders] = useState<BulkOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const orders = await fetchBulkOrders();
+        setBulkOrders(orders);
+      } catch (e) {
+        setError('Failed to fetch bulk orders');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const [currentPage, setCurrentPage] = useState(1);
   // --- MODIFIED: Set items per page to 5 to show pagination ---

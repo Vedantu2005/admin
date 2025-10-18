@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { fetchContactMessages } from '../../firebase/contactMessageService';
 import { ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 
 interface Contact {
@@ -6,102 +7,40 @@ interface Contact {
   firstName: string;
   lastName: string;
   email: string;
-  mobileNo: string;
+  phone: string;
   message: string;
+  createdAt?: any;
 }
 
 const ContactManager: React.FC = () => {
-  // Sample data with Indian details
-  const [contacts] = useState<Contact[]>([
-    {
-      id: '1',
-      firstName: 'Rohan',
-      lastName: 'Joshi',
-      email: 'rohan.joshi@example.com',
-      mobileNo: '+91 9820098200',
-      message: 'I would like to know more about your services.'
-    },
-    {
-      id: '2',
-      firstName: 'Isha',
-      lastName: 'Mehra',
-      email: 'isha@company.co.in',
-      mobileNo: '+91 9930099300',
-      message: 'Can you provide a quote for your premium package?'
-    },
-    {
-      id: '3',
-      firstName: 'Arjun',
-      lastName: 'Nair',
-      email: 'arjun.nair@email.com',
-      mobileNo: '+91 9819098190',
-      message: 'Interested in scheduling a consultation for our upcoming project. Please contact me at your earliest convenience.'
-    },
-    {
-      id: '4',
-      firstName: 'Saanvi',
-      lastName: 'Reddy',
-      email: 'saanvi@business.in',
-      mobileNo: '+91 9870098700',
-      message: 'Need technical support for implementation. Having some issues with the setup process.'
-    },
-    {
-      id: '5',
-      firstName: 'Kabir',
-      lastName: 'Malhotra',
-      email: 'kabir@company.org',
-      mobileNo: '+91 9892098920',
-      message: 'Would like to discuss partnership opportunities. Our company is interested in collaboration.'
-    },
-    {
-      id: '6',
-      firstName: 'Diya',
-      lastName: 'Chopra',
-      email: 'diya@solutions.com',
-      mobileNo: '+91 9867098670',
-      message: 'Question about pricing and availability for enterprise solutions. Need detailed information.'
-    },
-    {
-      id: '7',
-      firstName: 'Advik',
-      lastName: 'Verma',
-      email: 'advik.v@webmail.in',
-      mobileNo: '+91 9987099870',
-      message: 'Following up on our previous conversation regarding the project timeline.'
-    },
-    {
-      id: '8',
-      firstName: 'Myra',
-      lastName: 'Gupta',
-      email: 'myra.gupta@personal.com',
-      mobileNo: '+91 9967099670',
-      message: 'I have a billing inquiry that needs to be resolved.'
-    },
-    {
-      id: '9',
-      firstName: 'Aarav',
-      lastName: 'Singh',
-      email: 'aarav@singhenterprises.com',
-      mobileNo: '+91 9167091670',
-      message: 'Request for a demo of your latest software update.'
-    },
-    {
-      id: '10',
-      firstName: 'Zara',
-      lastName: 'Khan',
-      email: 'zara.khan@fashion.co.in',
-      mobileNo: '+91 9029090290',
-      message: 'Inquiring about vendor registration and policies.'
-    },
-    {
-      id: '11',
-      firstName: 'Vivaan',
-      lastName: 'Agarwal',
-      email: 'vivaan.a@tradecorp.in',
-      mobileNo: '+91 9320093200',
-      message: 'Need to update my contact information in your records.'
-    }
-  ]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const messages = await fetchContactMessages();
+        // Map to match the Contact interface used in this component
+        setContacts(messages.map(msg => ({
+          id: msg.id,
+          firstName: msg.firstName,
+          lastName: msg.lastName,
+          email: msg.email,
+          mobileNo: msg.phone,
+          message: msg.message,
+          createdAt: msg.createdAt,
+        })));
+      } catch (e) {
+        setError('Failed to fetch contact messages');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const [currentPage, setCurrentPage] = useState(1);
   // --- MODIFIED: Set items per page to 5 to show pagination ---
