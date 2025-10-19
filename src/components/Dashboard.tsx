@@ -19,6 +19,7 @@ import GiftList from './sections/GiftList';
 import BestSeller from './sections/BestSeller';
 import ProductOfTheDay from './sections/ProductOfTheDay';
 import Slider from './sections/Slider';
+import UserManager from './sections/UserManager';
 
 // --- Product Data and Type Definitions ---
 export interface ProductVariant {
@@ -377,7 +378,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       case 'product-best-seller': 
         return <BestSeller allItems={getAllItemsForDropdown()} />;
 
-      default: return <BlogManager />;
+  case 'user': return <UserManager />;
+  default: return <BlogManager />;
     }
   };
 

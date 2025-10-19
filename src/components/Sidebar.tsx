@@ -18,6 +18,7 @@ import {
   Home,
   Image as ImageIcon,
   Menu,
+  User as UserIcon,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -51,6 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
     { id: 'podcast', label: 'Podcast', icon: Mic },
     { id: 'bulk-order', label: 'Bulk Order', icon: ShoppingCart },
     { id: 'contact', label: 'Contact', icon: MessageCircle },
+    { id: 'user', label: 'User', icon: UserIcon },
   ];
 
   const homeSubItems = [
