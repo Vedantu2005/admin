@@ -53,6 +53,10 @@ const Slider: React.FC = () => {
             alert('Please enter some text');
             return;
         }
+        if ([...newText].length > 125) {
+            alert('Slider text must be 125 characters or less.');
+            return;
+        }
 
         setSaving(true);
         try {
@@ -86,6 +90,10 @@ const Slider: React.FC = () => {
     const handleEditSave = async (id: string) => {
         if (!editingText.trim()) {
             alert('Please enter some text');
+            return;
+        }
+        if ([...editingText].length > 125) {
+            alert('Slider text must be 125 characters or less.');
             return;
         }
 
@@ -160,6 +168,12 @@ const Slider: React.FC = () => {
                         className="flex-1 p-3 border border-[#703102] rounded-md focus:ring-2 focus:ring-[#703102]/50 focus:border-[#703102] resize-none"
                         rows={3}
                     />
+                    <div className="text-sm text-gray-500 mt-2">
+                        {`Characters: ${[...newText].length}/125`}
+                        {[...newText].length > 125 && (
+                            <span className="text-red-600 ml-2">Limit exceeded!</span>
+                        )}
+                    </div>
                     <button
                         onClick={handleAddText}
                         disabled={saving || !newText.trim()}
@@ -197,6 +211,12 @@ const Slider: React.FC = () => {
                                             className="w-full p-3 border border-[#703102] rounded-md focus:ring-2 focus:ring-[#703102]/50 focus:border-[#703102] resize-none"
                                             rows={3}
                                         />
+                                        <div className="text-sm text-gray-500 mt-2">
+                                            {`Characters: ${[...editingText].length}/125`}
+                                            {[...editingText].length > 125 && (
+                                                <span className="text-red-600 ml-2">Limit exceeded!</span>
+                                            )}
+                                        </div>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => handleEditSave(item.id)}
