@@ -311,22 +311,22 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const renderActiveSection = () => {
     // Helper to create the combined list for dropdowns
     const getAllItemsForDropdown = () => [
-        ...products.map(p => ({ 
-            id: p.firestoreId || p.id, 
-            name: p.category,
-            collection: 'products'
-        })),
-        ...comboProducts.map(p => ({ 
-            id: p.firestoreId || p.id, 
-            name: p.category,
-            collection: 'comboProducts'
-        })),
-        ...giftProducts.map(p => ({ 
-            id: p.firestoreId || p.id, 
-            name: p.category,
-            collection: 'giftProducts'
-        }))
-    ];
+    ...products.map(p => ({ 
+      id: p.firestoreId || p.id, 
+      name: p.productName,
+      collection: 'products'
+    })),
+    ...comboProducts.map(p => ({ 
+      id: p.firestoreId || p.id, 
+      name: p.productName,
+      collection: 'comboProducts'
+    })),
+    ...giftProducts.map(p => ({ 
+      id: p.firestoreId || p.id, 
+      name: p.productName || p.category,
+      collection: 'giftProducts'
+    }))
+  ];
 
     // Show loading or error states
     if (loading) {

@@ -60,6 +60,12 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
     const mainImageInputRef = useRef<HTMLInputElement>(null);
     const otherImagesInputRef = useRef<HTMLInputElement>(null);
 
+    // State to track removed existing images
+    const [removedExistingOtherImages, setRemovedExistingOtherImages] = useState<boolean[]>([]);
+
+    // State to track removed main image
+    const [mainImageRemoved, setMainImageRemoved] = useState(false);
+
     // Effect to populate form when in "Edit" mode
     useEffect(() => {
         if (productToEdit) {
@@ -89,10 +95,43 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
         }
     }, [productToEdit]);
 
+    // Effect to initialize removedExistingOtherImages state
+    useEffect(() => {
+        if (productToEdit) {
+            setRemovedExistingOtherImages(productToEdit.otherImages ? new Array(productToEdit.otherImages.length).fill(false) : []);
+        }
+    }, [productToEdit]);
+
+    // Effect to reset mainImageRemoved state on productToEdit change
+    useEffect(() => {
+        if (productToEdit) {
+            setMainImageRemoved(false);
+        }
+    }, [productToEdit]);
+
     // --- FORM HANDLERS ---
     const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
-        setFormState(prev => ({...prev, [id]: value}));
+        if (id === 'actualMRP' || id === 'discount') {
+          setFormState(prev => {
+            const updated = {
+              ...prev,
+              [id]: parseFloat(value) || 0
+            };
+            const actual = id === 'actualMRP' ? parseFloat(value) || 0 : updated.actualMRP;
+            const discount = id === 'discount' ? parseFloat(value) || 0 : updated.discount;
+            let sellingMRP = actual;
+            if (actual > 0 && discount > 0) {
+              sellingMRP = Math.round(actual - (actual * discount) / 100);
+            }
+            return {
+              ...updated,
+              sellingMRP
+            };
+          });
+        } else {
+          setFormState(prev => ({...prev, [id]: value}));
+        }
     };
     
     const handleReset = () => {
@@ -118,8 +157,8 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
         setUploadProgress(0);
         
         try {
-            let mainImageUrl = productToEdit?.mainImage || '';
-            let otherImageUrls: string[] = productToEdit?.otherImages || [];
+            let mainImageUrl = productToEdit?.mainImage && !mainImageRemoved ? productToEdit.mainImage : '';
+            let otherImageUrls: string[] = productToEdit?.otherImages?.filter((_, idx) => !removedExistingOtherImages[idx]) || [];
 
             // Upload main image if selected
             if (mainImage) {
@@ -227,11 +266,37 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
     const removeOtherImage = (indexToRemove: number) => {
         setOtherImages(prev => prev.filter((_, index) => index !== indexToRemove));
     };
+    const removeExistingOtherImage = (index: number) => {
+        setRemovedExistingOtherImages(prev => {
+            const updated = [...prev];
+            updated[index] = true;
+            return updated;
+        });
+    };
 
     // --- VARIANT HANDLERS ---
     const handleNewVariantChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setNewVariant(prev => ({ ...prev, [name]: name === 'bottleSize' ? value : parseFloat(value) || 0 }));
+        if (name === 'actualMRP' || name === 'discount') {
+          setNewVariant(prev => {
+            const updated = {
+              ...prev,
+              [name]: parseFloat(value) || 0
+            };
+            const actual = name === 'actualMRP' ? parseFloat(value) || 0 : updated.actualMRP;
+            const discount = name === 'discount' ? parseFloat(value) || 0 : updated.discount;
+            let sellingMRP = actual;
+            if (actual > 0 && discount > 0) {
+              sellingMRP = Math.round(actual - (actual * discount) / 100);
+            }
+            return {
+              ...updated,
+              sellingMRP
+            };
+          });
+        } else {
+          setNewVariant(prev => ({ ...prev, [name]: name === 'bottleSize' ? value : parseFloat(value) || 0 }));
+        }
     };
     const handleSaveVariant = () => {
         if (!newVariant.bottleSize || newVariant.actualMRP <= 0 || newVariant.sellingMRP <= 0) {
@@ -351,7 +416,11 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Upload Combo Product Image</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Main Image</label>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Main Image
+                <span className="block text-xs text-blue-600 mt-1">
+                  Recommended: <span className="font-semibold">800×800 px, square, under 2MB</span>
+                </span>
+              </label>
               <input type="file" ref={mainImageInputRef} onChange={handleMainImageChange} className="hidden" accept="image/*" />
               <div onClick={() => mainImageInputRef.current?.click()} className="relative group border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center cursor-pointer hover:border-[#703102] transition-colors">
                 {mainImage ? (
@@ -359,10 +428,10 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
                     <img src={URL.createObjectURL(mainImage)} alt="Main preview" className="max-h-full max-w-full object-contain" />
                     <button onClick={(e) => { e.stopPropagation(); setMainImage(null); }} className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove main image">✕</button>
                   </>
-                ) : productToEdit?.mainImage ? (
+                ) : productToEdit?.mainImage && !mainImageRemoved ? (
                   <>
                     <img src={productToEdit.mainImage} alt="Existing main image" className="max-h-full max-w-full object-contain" />
-                    <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center text-xs">✓</div>
+                    <button onClick={(e) => { e.stopPropagation(); setMainImageRemoved(true); }} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove existing main image">✕</button>
                   </>
                 ) : (
                   <p className="text-gray-400 text-center">Click to upload main image</p>
@@ -370,19 +439,23 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Other Images (max 5)</label>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Other Images (max 5)
+                <span className="block text-xs text-blue-600 mt-1">
+                  Recommended: <span className="font-semibold">800×800 px, square, under 2MB</span>
+                </span>
+              </label>
               <input type="file" ref={otherImagesInputRef} onChange={handleOtherImagesChange} className="hidden" accept="image/*" multiple disabled={(otherImages.length + (productToEdit?.otherImages?.length || 0)) >= 5} />
               <div onClick={() => (otherImages.length + (productToEdit?.otherImages?.length || 0)) < 5 && otherImagesInputRef.current?.click()} className={`border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center transition-colors ${(otherImages.length + (productToEdit?.otherImages?.length || 0)) < 5 ? 'cursor-pointer hover:border-[#703102]' : 'cursor-not-allowed bg-gray-100'}`}>
                 {(otherImages.length > 0 || (productToEdit?.otherImages && productToEdit.otherImages.length > 0)) ? (
                   <div className="grid grid-cols-3 gap-2 w-full h-full overflow-y-auto">
                     {/* Show existing images from database */}
                     {productToEdit?.otherImages?.map((imageUrl, index) => (
-                      <div key={`existing-${index}`} className="relative group w-full h-24">
-                        <img src={imageUrl} alt={`Existing image ${index + 1}`} className="w-full h-full object-cover rounded" />
-                        <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-1 leading-none w-5 h-5 flex items-center justify-center text-xs">
-                          ✓
+                      !removedExistingOtherImages[index] && (
+                        <div key={`existing-${index}`} className="relative group w-full h-24">
+                          <img src={imageUrl} alt={`Existing image ${index + 1}`} className="w-full h-full object-cover rounded" />
+                          <button onClick={(e) => { e.stopPropagation(); removeExistingOtherImage(index); }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 leading-none w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove existing image">✕</button>
                         </div>
-                      </div>
+                      )
                     ))}
                     {/* Show new images being uploaded */}
                     {otherImages.map((file, index) => (
@@ -417,7 +490,7 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="sellingMRP" className="block text-md font-semibold text-gray-700 mb-2">Selling MRP*</label>
-                <input type="number" id="sellingMRP" value={formState.sellingMRP > 0 ? formState.sellingMRP : ''} onChange={handleFormChange} placeholder="number field" className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50" />
+                <input type="number" id="sellingMRP" value={formState.sellingMRP > 0 ? formState.sellingMRP : ''} disabled placeholder="number field" className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50 bg-gray-100 cursor-not-allowed" />
               </div>
               <div>
                 <label htmlFor="discount" className="block text-md font-semibold text-gray-700 mb-2">Discount in %</label>
@@ -557,7 +630,7 @@ const AddComboProduct: React.FC<AddComboProductProps> = ({ onSaveProduct, produc
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="variant-selling-mrp" className="block text-md font-semibold text-gray-700 mb-2">Selling MRP*</label>
-                    <input type="number" id="variant-selling-mrp" name="sellingMRP" placeholder="number field" value={newVariant.sellingMRP > 0 ? newVariant.sellingMRP : ''} onChange={handleNewVariantChange} className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50" />
+              <input type="number" id="variant-selling-mrp" name="sellingMRP" placeholder="number field" value={newVariant.sellingMRP > 0 ? newVariant.sellingMRP : ''} disabled className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50 bg-gray-100 cursor-not-allowed" />
                   </div>
                   <div>
                     <label htmlFor="variant-discount" className="block text-md font-semibold text-gray-700 mb-2">Discount in %</label>

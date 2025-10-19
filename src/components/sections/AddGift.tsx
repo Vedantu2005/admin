@@ -19,6 +19,8 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
         productName: '',
         category: '',
         mrp: 0,
+        discount: 0,
+        sellingMRP: 0,
         contents: '',
         description: '',
     }), []);
@@ -73,6 +75,8 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
                 productName: productToEdit.category,
                 category: productToEdit.category,
                 mrp: productToEdit.mrp,
+                discount: 0,
+                sellingMRP: productToEdit.mrp,
                 contents: productToEdit.contents,
                 description: productToEdit.description || '',
             });
@@ -96,7 +100,26 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
 
     const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
-        setFormState(prev => ({...prev, [id]: id === 'mrp' ? parseFloat(value) || 0 : value }));
+        if (id === 'mrp' || id === 'discount') {
+            setFormState(prev => {
+                const updated = {
+                    ...prev,
+                    [id]: parseFloat(value) || 0
+                };
+                const mrp = id === 'mrp' ? parseFloat(value) || 0 : updated.mrp;
+                const discount = id === 'discount' ? parseFloat(value) || 0 : updated.discount;
+                let sellingMRP = mrp;
+                if (mrp > 0 && discount > 0) {
+                    sellingMRP = Math.round(mrp - (mrp * discount) / 100);
+                }
+                return {
+                    ...updated,
+                    sellingMRP
+                };
+            });
+        } else {
+            setFormState(prev => ({...prev, [id]: value }));
+        }
     };
     
     const handleSave = async () => {
@@ -156,6 +179,8 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
                 image: imageUrl,
                 category: formState.productName,
                 mrp: formState.mrp,
+                discount: formState.discount,
+                sellingMRP: formState.sellingMRP,
                 contents: formState.contents,
                 description: formState.description,
                 otherImages: otherImageUrls.length > 0 ? otherImageUrls : undefined,
@@ -265,6 +290,14 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
               <label htmlFor="mrp" className="block text-sm font-medium text-gray-600 mb-1">MRP*</label>
               <input type="number" id="mrp" value={formState.mrp > 0 ? formState.mrp : ''} onChange={handleFormChange} placeholder="e.g., 999" className="w-full p-2 border border-[#703102] rounded-md focus:ring-2 focus:ring-[#703102]/50 focus:border-[#703102]" />
             </div>
+            <div className="md:col-span-1">
+              <label htmlFor="discount" className="block text-sm font-medium text-gray-600 mb-1">Discount in %</label>
+              <input type="number" id="discount" value={formState.discount > 0 ? formState.discount : ''} onChange={handleFormChange} placeholder="e.g., 10" className="w-full p-2 border border-[#703102] rounded-md focus:ring-2 focus:ring-[#703102]/50 focus:border-[#703102]" />
+            </div>
+            <div className="md:col-span-1">
+              <label htmlFor="sellingMRP" className="block text-sm font-medium text-gray-600 mb-1">Selling MRP*</label>
+              <input type="number" id="sellingMRP" value={formState.sellingMRP > 0 ? formState.sellingMRP : ''} disabled placeholder="Auto-calculated" className="w-full p-2 border border-[#703102] rounded-md focus:ring-2 focus:ring-[#703102]/50 focus:border-[#703102] bg-gray-100 cursor-not-allowed" />
+            </div>
             <div className="md:col-span-2">
               <label htmlFor="contents" className="block text-sm font-medium text-gray-600 mb-1">Contents</label>
               <textarea id="contents" value={formState.contents} onChange={handleFormChange} rows={3} placeholder="List items included in the gift pack" className="w-full p-2 border border-[#703102] rounded-md focus:ring-2 focus:ring-[#703102]/50 focus:border-[#703102]"></textarea>
@@ -281,6 +314,9 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1">
                 Main Image
+                <span className="block text-xs text-blue-600 mt-1">
+                  Recommended: <span className="font-semibold">800×800 px, square, under 2MB</span>
+                </span>
                 {productToEdit?.image && !mainImage && !imageRemoved && (
                   <span className="text-xs text-blue-600 ml-2">(Current image shown - click to change)</span>
                 )}
@@ -321,7 +357,11 @@ const AddGift: React.FC<AddGiftProps> = ({ onSaveProduct, productToEdit }) => {
           {/* Single upload block for multiple images */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-2">Upload Multiple Images</label>
+              <label className="block text-sm font-medium text-gray-600 mb-2">Upload Multiple Images
+                <span className="block text-xs text-blue-600 mt-1">
+                  Recommended: <span className="font-semibold">800×800 px, square, under 2MB</span>
+                </span>
+              </label>
               <input 
                 type="file" 
                 ref={otherImagesInputRef}

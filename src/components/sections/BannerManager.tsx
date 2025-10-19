@@ -222,17 +222,17 @@ const BannerManager: React.FC = () => {
       {/* Upload Section */}
       <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Upload New Banner</h2>
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-sm text-blue-800">
-            <strong>Banner Requirements:</strong> Images must be exactly 1920 × 600 pixels for desktop display.
-          </p>
-        </div>
+        
         
         <div className="space-y-4">
           {/* File Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Banner Image <span className="text-red-500">*</span>
+       
+              <span className="block text-xs text-blue-600 mt-1">
+                Required size:
+                <span className="font-semibold"> 1920×600 px</span>
+              </span>
             </label>
             <input
               id="bannerFile"

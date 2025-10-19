@@ -32,8 +32,10 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
     const [formState, setFormState] = useState(initialFormState);
     const [mainImage, setMainImage] = useState<File | null>(null);
     const [otherImages, setOtherImages] = useState<File[]>([]);
+    const [removedExistingOtherImages, setRemovedExistingOtherImages] = useState<boolean[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const [mainImageRemoved, setMainImageRemoved] = useState(false);
     
     // Default variants and FAQs are now set here
     const [variants, setVariants] = useState<ProductVariant[]>([
@@ -60,7 +62,26 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
     // --- FORM HANDLERS ---
     const handleFormChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
-        setFormState(prev => ({...prev, [id]: value}));
+        if (id === 'actualMRP' || id === 'discount') {
+            setFormState(prev => {
+                const updated = {
+                    ...prev,
+                    [id]: parseFloat(value) || 0
+                };
+                const actual = id === 'actualMRP' ? parseFloat(value) || 0 : updated.actualMRP;
+                const discount = id === 'discount' ? parseFloat(value) || 0 : updated.discount;
+                let sellingMRP = actual;
+                if (actual > 0 && discount > 0) {
+                    sellingMRP = Math.round(actual - (actual * discount) / 100);
+                }
+                return {
+                    ...updated,
+                    sellingMRP
+                };
+            });
+        } else {
+            setFormState(prev => ({...prev, [id]: value}));
+        }
     };
     
     const handleReset = useCallback(() => {
@@ -75,6 +96,8 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
             { id: Date.now() + 3, question: 'What is the shelf life of the oil?', answer: 'The shelf life is approximately 12 months from the date of manufacturing.' },
             { id: Date.now() + 4, question: 'Is this oil cold-pressed?', answer: 'Yes, our oil is 100% cold-pressed.'}
         ]);
+        setRemovedExistingOtherImages([]);
+        setMainImageRemoved(false);
         if (mainImageInputRef.current) mainImageInputRef.current.value = '';
         if (otherImagesInputRef.current) otherImagesInputRef.current.value = '';
     }, [initialFormState]);
@@ -130,8 +153,8 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
             setIsUploading(true);
             setUploadProgress(0);
 
-            let mainImageUrl = productToEdit?.mainImage || '';
-            let otherImageUrls: string[] = productToEdit?.otherImages || [];
+            let mainImageUrl = productToEdit?.mainImage && !mainImageRemoved ? productToEdit.mainImage : '';
+            let otherImageUrls: string[] = productToEdit?.otherImages?.filter((_, idx) => !removedExistingOtherImages[idx]) || [];
 
             // Upload main image to Cloudinary if a new one is selected
             if (mainImage) {
@@ -255,10 +278,39 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
     setOtherImages(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
+  const removeExistingOtherImage = (index: number) => {
+    setRemovedExistingOtherImages(prev => {
+        const updated = [...prev];
+        updated[index] = true;
+        return updated;
+    });
+  };
+
   // --- VARIANT HANDLERS ---
   const handleNewVariantChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setNewVariant(prev => ({ ...prev, [name]: name === 'bottleSize' ? value : parseFloat(value) || 0 }));
+    if (name === 'actualMRP' || name === 'discount') {
+      // Update actualMRP or discount, then recalculate sellingMRP
+      setNewVariant(prev => {
+        const updated = {
+          ...prev,
+          [name]: parseFloat(value) || 0
+        };
+        // Calculate sellingMRP
+        const actual = name === 'actualMRP' ? parseFloat(value) || 0 : updated.actualMRP;
+        const discount = name === 'discount' ? parseFloat(value) || 0 : updated.discount;
+        let sellingMRP = actual;
+        if (actual > 0 && discount > 0) {
+          sellingMRP = Math.round(actual - (actual * discount) / 100);
+        }
+        return {
+          ...updated,
+          sellingMRP
+        };
+      });
+    } else {
+      setNewVariant(prev => ({ ...prev, [name]: name === 'bottleSize' ? value : parseFloat(value) || 0 }));
+    }
   };
   
   const handleSaveVariant = () => {
@@ -345,6 +397,18 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
       setNewFaq({ question: '', answer: '' });
   };
 
+  useEffect(() => {
+    if (productToEdit) {
+        setRemovedExistingOtherImages(productToEdit.otherImages ? new Array(productToEdit.otherImages.length).fill(false) : []);
+    }
+}, [productToEdit]);
+
+    useEffect(() => {
+        if (productToEdit) {
+            setMainImageRemoved(false);
+        }
+    }, [productToEdit]);
+
   return (
     <div className="bg-gray-50 p-6 sm:p-0 font-sans">
       <div className="space-y-6">
@@ -389,45 +453,46 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
           <h2 className="text-lg font-semibold text-gray-700 mb-4">Upload Product Image</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Main Image</label>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Main Image
+                <span className="block text-xs text-blue-600 mt-1">
+                  Recommended: <span className="font-semibold">800×800 px, square, under 2MB</span>
+                </span>
+              </label>
               <input type="file" ref={mainImageInputRef} onChange={handleMainImageChange} className="hidden" accept="image/*" />
               <div onClick={() => mainImageInputRef.current?.click()} className="relative group border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center cursor-pointer hover:border-[#703102] transition-colors">
                 {mainImage ? (
-                  <img src={URL.createObjectURL(mainImage)} alt="Main preview" className="max-h-full max-w-full object-contain" />
-                ) : productToEdit?.mainImage ? (
-                  <img src={productToEdit.mainImage} alt="Current main image" className="max-h-full max-w-full object-contain" />
+                  <>
+                    <img src={URL.createObjectURL(mainImage)} alt="Main preview" className="max-h-full max-w-full object-contain" />
+                    <button onClick={(e) => { e.stopPropagation(); setMainImage(null); }} className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove main image">✕</button>
+                  </>
+                ) : productToEdit?.mainImage && !mainImageRemoved ? (
+                  <>
+                    <img src={productToEdit.mainImage} alt="Current main image" className="max-h-full max-w-full object-contain" />
+                    <button onClick={(e) => { e.stopPropagation(); setMainImageRemoved(true); }} className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove existing main image">✕</button>
+                  </>
                 ) : (
                   <p className="text-gray-400 text-center">Click to upload main image</p>
-                )}
-                {(mainImage || productToEdit?.mainImage) && (
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      setMainImage(null); 
-                      // Note: This only clears the new upload, existing image remains in productToEdit
-                    }} 
-                    className="absolute top-2 right-2 bg-black bg-opacity-50 text-white rounded-full p-1 leading-none w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" 
-                    aria-label="Remove main image"
-                  >
-                    ✕
-                  </button>
                 )}
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Other Images (max 5)</label>
+              <label className="block text-sm font-medium text-gray-600 mb-1">Other Images (max 5)
+                <span className="block text-xs text-blue-600 mt-1">
+                  Recommended: <span className="font-semibold">800×800 px, square, under 2MB</span>
+                </span>
+              </label>
               <input type="file" ref={otherImagesInputRef} onChange={handleOtherImagesChange} className="hidden" accept="image/*" multiple disabled={(otherImages.length + (productToEdit?.otherImages?.length || 0)) >= 5} />
               <div onClick={() => (otherImages.length + (productToEdit?.otherImages?.length || 0)) < 5 && otherImagesInputRef.current?.click()} className={`border-2 border-dashed border-gray-300 rounded-lg p-4 h-48 flex items-center justify-center transition-colors ${(otherImages.length + (productToEdit?.otherImages?.length || 0)) < 5 ? 'cursor-pointer hover:border-[#703102]' : 'cursor-not-allowed bg-gray-100'}`}>
                 {(otherImages.length > 0 || (productToEdit?.otherImages && productToEdit.otherImages.length > 0)) ? (
                   <div className="grid grid-cols-3 gap-2 w-full h-full overflow-y-auto">
                     {/* Show existing images from database */}
                     {productToEdit?.otherImages?.map((imageUrl, index) => (
-                      <div key={`existing-${index}`} className="relative group w-full h-24">
-                        <img src={imageUrl} alt={`Existing image ${index + 1}`} className="w-full h-full object-cover rounded" />
-                        <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full p-1 leading-none w-5 h-5 flex items-center justify-center text-xs">
-                          ✓
+                      !removedExistingOtherImages[index] && (
+                        <div key={`existing-${index}`} className="relative group w-full h-24">
+                          <img src={imageUrl} alt={`Existing image ${index + 1}`} className="w-full h-full object-cover rounded" />
+                          <button onClick={(e) => { e.stopPropagation(); removeExistingOtherImage(index); }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 leading-none w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Remove existing image">✕</button>
                         </div>
-                      </div>
+                      )
                     ))}
                     {/* Show new images being uploaded */}
                     {otherImages.map((file, index) => (
@@ -462,7 +527,7 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label htmlFor="sellingMRP" className="block text-md font-semibold text-gray-700 mb-2">Selling MRP*</label>
-                <input type="number" id="sellingMRP" value={formState.sellingMRP > 0 ? formState.sellingMRP : ''} onChange={handleFormChange} placeholder="number field" className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50" />
+                <input type="number" id="sellingMRP" value={formState.sellingMRP > 0 ? formState.sellingMRP : ''} disabled placeholder="number field" className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50 bg-gray-100 cursor-not-allowed" />
               </div>
               <div>
                 <label htmlFor="discount" className="block text-md font-semibold text-gray-700 mb-2">Discount in %</label>
@@ -603,7 +668,7 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
                   <label htmlFor="variant-bottle-size" className="block text-md font-semibold text-gray-700 mb-2">bottle size</label>
                   <select name="bottleSize" value={newVariant.bottleSize} onChange={handleNewVariantChange} className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50">
                     <option value="">dropdown like 250ml, 500ml, 1L, 2L, 5L</option>
-                    <option value="250 ml bottle">250ml</option><option value="500 ml bottle">500ml</option><option value="1 L bottle">1L</option><option value="2 L bottle">2L</option><option value="5 L bottle">5L</option>
+                    <option value="100 ml bottle">100ml</option><option value="250 ml bottle">250ml</option><option value="500 ml bottle">500ml</option><option value="1 L bottle">1L</option><option value="2 L bottle">2L</option><option value="5 L bottle">5L</option><option value="10 L bottle">10L</option>
                   </select>
                 </div>
                 <div>
@@ -613,7 +678,7 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="variant-selling-mrp" className="block text-md font-semibold text-gray-700 mb-2">Selling MRP*</label>
-                    <input type="number" id="variant-selling-mrp" name="sellingMRP" placeholder="number field" value={newVariant.sellingMRP > 0 ? newVariant.sellingMRP : ''} onChange={handleNewVariantChange} className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50" />
+                    <input type="number" id="variant-selling-mrp" name="sellingMRP" placeholder="number field" value={newVariant.sellingMRP > 0 ? newVariant.sellingMRP : ''} disabled className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50 bg-gray-100 cursor-not-allowed" />
                   </div>
                   <div>
                     <label htmlFor="variant-discount" className="block text-md font-semibold text-gray-700 mb-2">Discount in %</label>

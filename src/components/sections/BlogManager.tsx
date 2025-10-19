@@ -126,6 +126,7 @@ const BlogForm: React.FC<BlogFormProps> = ({
         onChange={handleImageUpload} 
         className="w-full p-2 border rounded-md" 
       />
+      <p className="text-xs text-gray-500 mt-1">JPG, PNG, GIF, or WebP. Max size: 2MB.</p>
       {formData.image && (
         <img 
           src={formData.image} 

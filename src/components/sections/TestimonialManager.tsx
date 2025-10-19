@@ -234,12 +234,14 @@ const TestimonialManager: React.FC = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Upload Image</label>
               <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100" />
+              <p className="text-xs text-gray-500 mt-1">JPG, PNG, GIF, or WebP. Max size: 2MB.</p>
               {formData.image && <img src={formData.image} alt="Preview" className="mt-2 w-24 h-24 object-cover rounded-full" />}
             </div>
             {formData.type === 'video' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Upload Video</label>
                 <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
+                <p className="text-xs text-gray-500 mt-1">MP4 or compatible. Max size: 15MB.</p>
                 {formData.videoFile && <video src={formData.videoFile} className="mt-2 w-64 h-36 object-cover rounded-lg" controls />}
               </div>
             )}
@@ -303,12 +305,14 @@ const TestimonialManager: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Upload Image</label>
                 <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100" />
+                <p className="text-xs text-gray-500 mt-1">JPG, PNG, GIF, or WebP. Max size: 50MB. Images over 10MB will be compressed.</p>
                 {formData.image && <img src={formData.image} alt="Preview" className="mt-2 w-24 h-24 object-cover rounded-full" />}
               </div>
               {formData.type === 'video' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Upload Video</label>
                   <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100" />
+                  <p className="text-xs text-gray-500 mt-1">MP4 or compatible. Max size: 100MB.</p>
                   {formData.videoFile && <video src={formData.videoFile} className="mt-2 w-64 h-36 object-cover rounded-lg" controls />}
                 </div>
               )}

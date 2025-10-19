@@ -185,7 +185,11 @@ const PodcastManager: React.FC = () => {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Upload Image</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Upload Image
+          <span className="block text-xs text-blue-600 mt-1">
+            Recommended: <span className="font-semibold">800×800 px, square, under 2MB</span>
+          </span>
+        </label>
         <input type="file" accept="image/*" onChange={handleImageUpload} className="w-full p-3 border border-gray-300 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"/>
         {formData.image && <img src={formData.image} alt="Preview" className="mt-2 w-32 h-32 object-cover rounded-lg" />}
       </div>
