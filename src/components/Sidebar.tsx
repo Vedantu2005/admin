@@ -53,6 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
     { id: 'bulk-order', label: 'Bulk Order', icon: ShoppingCart },
     { id: 'contact', label: 'Contact', icon: MessageCircle },
     { id: 'user', label: 'User', icon: UserIcon },
+    { id: 'review', label: 'Review', icon: Star },
   ];
 
   const homeSubItems = [

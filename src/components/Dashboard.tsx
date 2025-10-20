@@ -20,6 +20,7 @@ import BestSeller from './sections/BestSeller';
 import ProductOfTheDay from './sections/ProductOfTheDay';
 import Slider from './sections/Slider';
 import UserManager from './sections/UserManager';
+import ReviewManager from './sections/ReviewManager';
 
 // --- Product Data and Type Definitions ---
 export interface ProductVariant {
@@ -379,6 +380,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         return <BestSeller allItems={getAllItemsForDropdown()} />;
 
   case 'user': return <UserManager />;
+  case 'review': return <ReviewManager />;
   default: return <BlogManager />;
     }
   };
