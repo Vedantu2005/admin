@@ -253,7 +253,18 @@ const TestimonialManager: React.FC = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-              <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={4} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+              <textarea 
+                value={formData.description}
+                onChange={(e) => {
+                  const value = e.target.value.slice(0, 230);
+                  setFormData({ ...formData, description: value });
+                }}
+                maxLength={230}
+                rows={4}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                required
+              />
+              <div className="text-xs text-gray-500 mt-1">{formData.description.length}/230 characters</div>
             </div>
             <div className="flex space-x-3">
               <button 
@@ -324,7 +335,18 @@ const TestimonialManager: React.FC = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={4} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent" required />
+                <textarea 
+                  value={formData.description}
+                  onChange={(e) => {
+                    const value = e.target.value.slice(0, 230);
+                    setFormData({ ...formData, description: value });
+                  }}
+                  maxLength={230}
+                  rows={4}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  required
+                />
+                <div className="text-xs text-gray-500 mt-1">{formData.description.length}/230 characters</div>
               </div>
               <div className="flex space-x-3">
                 <button 
