@@ -1,9 +1,9 @@
 // Cloudinary configuration
 export const cloudinaryConfig = {
-  cloud_name: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'certiflyy', // Fallback to actual cloud name
-  api_key: import.meta.env.VITE_CLOUDINARY_API_KEY || '721369244799717',       // Fallback to actual API key
+  cloud_name: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
+  api_key: import.meta.env.VITE_CLOUDINARY_API_KEY,
   api_secret: '', // Don't expose API secret in client-side code
-  upload_preset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'certifly_preset' // Fallback to actual upload preset
+  upload_preset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET
 };
 
 // Validation to ensure configuration is set up

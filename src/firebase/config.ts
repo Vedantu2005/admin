@@ -2,13 +2,13 @@ import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA921NRCXj7WihnUbjEExCBBGAlrzbV2xU",
-  authDomain: "mittal-intern.firebaseapp.com",
-  projectId: "mittal-intern",
-  storageBucket: "mittal-intern.firebasestorage.app",
-  messagingSenderId: "227193150901",
-  appId: "1:227193150901:web:2e6e046ce9e07400064dfc",
-  measurementId: "G-3PS7PBNLSL"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 
