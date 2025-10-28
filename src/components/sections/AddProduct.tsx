@@ -89,8 +89,8 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
         setMainImage(null);
         setOtherImages([]);
         setVariants([
-            { id: Date.now() + 1, bottleSize: '500 ml bottle', actualMRP: 280, sellingMRP: 240, discount: 14, pricePerLiter: 480 },
-            { id: Date.now() + 2, bottleSize: '1 L bottle', actualMRP: 550, sellingMRP: 480, discount: 12, pricePerLiter: 480 },
+            { id: Date.now() + 1, bottleSize: '500 ml ', actualMRP: 280, sellingMRP: 240, discount: 14, pricePerLiter: 480 },
+            { id: Date.now() + 2, bottleSize: '1 L ', actualMRP: 550, sellingMRP: 480, discount: 12, pricePerLiter: 480 },
         ]);
         setFaqs([
             { id: Date.now() + 3, question: 'What is the shelf life of the oil?', answer: 'The shelf life is approximately 12 months from the date of manufacturing.' },
@@ -124,8 +124,8 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
                 setVariants(productToEdit.productVariants);
             } else {
                 setVariants([
-                    { id: Date.now() + 1, bottleSize: '500 ml bottle', actualMRP: 280, sellingMRP: 240, discount: 14, pricePerLiter: 480 },
-                    { id: Date.now() + 2, bottleSize: '1 L bottle', actualMRP: 550, sellingMRP: 480, discount: 12, pricePerLiter: 480 },
+                    { id: Date.now() + 1, bottleSize: '500 ml ', actualMRP: 280, sellingMRP: 240, discount: 14, pricePerLiter: 480 },
+                    { id: Date.now() + 2, bottleSize: '1 L ', actualMRP: 550, sellingMRP: 480, discount: 12, pricePerLiter: 480 },
                 ]);
             }
             
@@ -668,7 +668,7 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
                   <label htmlFor="variant-bottle-size" className="block text-md font-semibold text-gray-700 mb-2">bottle size</label>
                   <select name="bottleSize" value={newVariant.bottleSize} onChange={handleNewVariantChange} className="w-full p-3 border-2 border-[#703102] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#703102]/50">
                     <option value="">dropdown like 250ml, 500ml, 1L, 2L, 5L</option>
-                    <option value="100 ml bottle">100ml</option><option value="250 ml bottle">250ml</option><option value="500 ml bottle">500ml</option><option value="1 L bottle">1L</option><option value="2 L bottle">2L</option><option value="5 L bottle">5L</option><option value="10 L bottle">10L</option>
+                    <option value="100 ml">100ml</option><option value="250 ml">250ml</option><option value="500 ml">500ml</option><option value="1 L">1L</option><option value="2 L">2L</option><option value="5 L">5L</option><option value="10 L">10L</option>
                   </select>
                 </div>
                 <div>
