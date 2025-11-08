@@ -19,7 +19,7 @@ import GiftList from './sections/GiftList';
 import BestSeller from './sections/BestSeller';
 import ProductOfTheDay from './sections/ProductOfTheDay';
 import Slider from './sections/Slider';
-import UserManager from './sections/UserManager';
+import VisitorManager from './sections/VisitorManager';
 import ReviewManager from './sections/ReviewManager';
 
 // --- Product Data and Type Definitions ---
@@ -379,7 +379,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       case 'product-best-seller': 
         return <BestSeller allItems={getAllItemsForDropdown()} />;
 
-  case 'user': return <UserManager />;
+  case 'visitor': return <VisitorManager />;
   case 'review': return <ReviewManager />;
   default: return <BlogManager />;
     }
