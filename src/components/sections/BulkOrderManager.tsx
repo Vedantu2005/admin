@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchBulkOrders, BulkOrder } from '../../firebase/bulkOrderService';
+import { fetchBulkOrders, BulkOrder, deleteBulkOrder } from '../../firebase/bulkOrderService';
 import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
 
 
@@ -15,7 +15,8 @@ const BulkOrderManager: React.FC = () => {
       try {
         const orders = await fetchBulkOrders();
         setBulkOrders(orders);
-      } catch (e) {
+      } catch (error) {
+        console.error(error);
         setError('Failed to fetch bulk orders');
       } finally {
         setLoading(false);
@@ -25,6 +26,7 @@ const BulkOrderManager: React.FC = () => {
   }, []);
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   // --- MODIFIED: Set items per page to 5 to show pagination ---
   const itemsPerPage = 5;
   const totalPages = Math.ceil(bulkOrders.length / itemsPerPage);
@@ -47,6 +49,33 @@ const BulkOrderManager: React.FC = () => {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this bulk order? This action cannot be undone.');
+    if (!confirmed) return;
+    setDeletingId(id);
+    try {
+      await deleteBulkOrder(id);
+      setBulkOrders(prev => prev.filter(o => o.id !== id));
+    } catch (error) {
+      console.error(error);
+      setError('Failed to delete bulk order');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">Loading bulk orders...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-6 text-red-600">{error}</div>
+    );
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -68,6 +97,7 @@ const BulkOrderManager: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Product Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Company Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Message</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -93,6 +123,15 @@ const BulkOrderManager: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900 whitespace-normal break-words max-w-xs">
                     {order.message}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <button
+                      onClick={() => handleDelete(order.id)}
+                      disabled={deletingId === order.id}
+                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}

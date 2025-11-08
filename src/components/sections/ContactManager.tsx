@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchContactMessages } from '../../firebase/contactMessageService';
+import { fetchContactMessages, deleteContactMessage } from '../../firebase/contactMessageService';
 import { ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react';
 
 interface Contact {
@@ -9,7 +9,7 @@ interface Contact {
   email: string;
   phone: string;
   message: string;
-  createdAt?: any;
+  createdAt?: unknown;
 }
 
 const ContactManager: React.FC = () => {
@@ -21,7 +21,7 @@ const ContactManager: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
-      try {
+        try {
         const messages = await fetchContactMessages();
         // Map to match the Contact interface used in this component
         setContacts(messages.map(msg => ({
@@ -29,11 +29,12 @@ const ContactManager: React.FC = () => {
           firstName: msg.firstName,
           lastName: msg.lastName,
           email: msg.email,
-          mobileNo: msg.phone,
+          phone: msg.phone,
           message: msg.message,
           createdAt: msg.createdAt,
         })));
-      } catch (e) {
+      } catch (error) {
+        console.error(error);
         setError('Failed to fetch contact messages');
       } finally {
         setLoading(false);
@@ -43,6 +44,7 @@ const ContactManager: React.FC = () => {
   }, []);
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   // --- MODIFIED: Set items per page to 5 to show pagination ---
   const itemsPerPage = 10;
   const totalPages = Math.ceil(contacts.length / itemsPerPage);
@@ -65,6 +67,33 @@ const ContactManager: React.FC = () => {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    const confirmed = window.confirm('Are you sure you want to delete this contact message? This action cannot be undone.');
+    if (!confirmed) return;
+    setDeletingId(id);
+    try {
+      await deleteContactMessage(id);
+      setContacts(prev => prev.filter(c => c.id !== id));
+    } catch (error) {
+      console.error(error);
+      setError('Failed to delete contact message');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">Loading contacts...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-6 text-red-600">{error}</div>
+    );
+  }
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -84,6 +113,7 @@ const ContactManager: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Mobile No.</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Message</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -99,10 +129,19 @@ const ContactManager: React.FC = () => {
                     {contact.email}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {contact.mobileNo}
+                    {contact.phone}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900 whitespace-normal break-words max-w-xs">
                     {contact.message}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <button
+                      onClick={() => handleDelete(contact.id)}
+                      disabled={deletingId === contact.id}
+                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}

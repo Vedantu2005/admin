@@ -1,9 +1,9 @@
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, deleteDoc, doc } from 'firebase/firestore';
 import { db } from './config';
 
 export interface ContactMessage {
   id: string;
-  createdAt?: any;
+  createdAt?: unknown;
   email: string;
   firstName: string;
   lastName: string;
@@ -26,4 +26,8 @@ export async function fetchContactMessages(): Promise<ContactMessage[]> {
       phone: data.phone || '',
     };
   });
+}
+
+export async function deleteContactMessage(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'contactMessages', id));
 }

@@ -1,4 +1,4 @@
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, orderBy, query, deleteDoc, doc } from 'firebase/firestore';
 import { db } from './config';
 
 export interface BulkOrder {
@@ -28,4 +28,8 @@ export async function fetchBulkOrders(): Promise<BulkOrder[]> {
       message: data.message || '',
     };
   });
+}
+
+export async function deleteBulkOrder(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'bulkOrders', id));
 }
