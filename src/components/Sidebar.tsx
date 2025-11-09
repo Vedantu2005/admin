@@ -10,6 +10,7 @@ import {
   Package,
   Plus, // Changed from ChevronDown
   Minus, // Changed from ChevronUp
+  DownloadCloud,
   PlusCircle,
   List,
   Gift,
@@ -53,7 +54,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
     { id: 'bulk-order', label: 'Bulk Order', icon: ShoppingCart },
     { id: 'contact', label: 'Contact', icon: MessageCircle },
     { id: 'visitor', label: 'Visitor', icon: UserIcon },
-    { id: 'review', label: 'Review', icon: Star },
+      { id: 'review', label: 'Review', icon: Star },
+      { id: 'export', label: 'Export', icon: DownloadCloud },
   ];
 
   const homeSubItems = [
@@ -84,7 +86,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeSection, onSectionChange, onLog
     return (
       <button
         key={item.id}
-        onClick={() => onSectionChange(item.id)}
+        onClick={() => {
+          if (item.id === 'export') {
+            // Dispatch a custom event which the VisitorManager listens to and
+            // triggers the export handler. This avoids changing navigation logic.
+            window.dispatchEvent(new CustomEvent('admin:export-users-orders'));
+          } else {
+            onSectionChange(item.id);
+          }
+        }}
         className={`w-full flex items-center p-3 rounded-lg transition-all ${isCollapsed ? 'justify-center' : 'space-x-3'} ${
           isActive
             ? 'text-amber-900 shadow-lg'
