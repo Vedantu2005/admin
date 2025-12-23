@@ -23,14 +23,6 @@ import VisitorManager from './sections/VisitorManager';
 import ReviewManager from './sections/ReviewManager';
 
 // --- Product Data and Type Definitions ---
-export interface ProductVariant {
-  id: number;
-  bottleSize: string;
-  actualMRP: number;
-  sellingMRP: number;
-  discount: number;
-  pricePerLiter: number;
-}
 
 export interface ProductFaq {
   id: number;
@@ -45,14 +37,14 @@ export interface Product {
   // Basic product info
   productName: string;
   category: string;
+  size: string; // NEW: Replaces variants
   shortDescription: string;
   rating: string;
   longDescription: string;
   
-  // Pricing (legacy compatibility)
+  // Pricing
   actualMRP: number;
   sellingMRP: number;
-  variants: number; // Count of variants
   status: 'Active' | 'Inactive';
   
   // Images
@@ -65,8 +57,7 @@ export interface Product {
   benefits?: string;
   storageInfo?: string;
   
-  // Variants and FAQs
-  productVariants?: ProductVariant[];
+  // FAQs (Variants removed)
   productFaqs?: ProductFaq[];
 }
 

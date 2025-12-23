@@ -94,6 +94,7 @@ export class ProductService {
           // Basic product info
           productName: data.productName || data.category || '',
           category: data.category || '',
+          size: data.size || '', // NEW: Mapped from Firestore
           shortDescription: data.shortDescription || '',
           rating: data.rating || '',
           longDescription: data.longDescription || '',
@@ -101,7 +102,6 @@ export class ProductService {
           // Pricing (for backward compatibility with ProductList)
           actualMRP: data.actualMRP || 0,
           sellingMRP: data.sellingMRP || 0,
-          variants: data.variants || (data.productVariants?.length || 0),
           status: data.status || 'Active',
           
           // Images (backward compatibility)
@@ -114,8 +114,7 @@ export class ProductService {
           benefits: data.benefits,
           storageInfo: data.storageInfo,
           
-          // Variants and FAQs
-          productVariants: data.productVariants,
+          // FAQs (Variants removed)
           productFaqs: data.productFaqs,
         } as Product & { firestoreId: string });
       });

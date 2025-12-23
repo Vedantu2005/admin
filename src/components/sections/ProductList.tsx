@@ -101,7 +101,7 @@ const ProductList: React.FC<ProductListProps> = ({
               <th className="p-4">Actual MRP</th>
               <th className="p-4">Selling MRP</th>
               <th className="p-4">Discount</th>
-              <th className="p-4">Variants</th>
+              <th className="p-4">Size</th>
               <th className="p-4">Status</th>
               <th className="p-4">Action</th>
             </tr>
@@ -129,7 +129,7 @@ const ProductList: React.FC<ProductListProps> = ({
                       {calculateDiscount(product.actualMRP, product.sellingMRP)}%
                     </span>
                   </td>
-                  <td className="p-4 text-gray-600 text-center">{product.variants}</td>
+                  <td className="p-4 text-gray-600 font-bold">{product.size}</td>
                   <td className="p-4">
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                       product.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
