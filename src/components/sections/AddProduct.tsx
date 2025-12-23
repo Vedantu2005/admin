@@ -9,7 +9,7 @@ import {
 
 // --- Define props interface ---
 interface AddProductProps {
-    onSaveProduct: (productData: Omit<Product, 'id' | 'status' | 'firestoreId'>, id: number | null) => void;
+    onSaveProduct: (productData: Omit<Product, 'id' | 'status' | 'firestoreId'>) => void;
     productToEdit: Product | null;
 }
 
@@ -216,7 +216,7 @@ const AddProduct: React.FC<AddProductProps> = ({ onSaveProduct, productToEdit })
             };
             
             setUploadProgress(100);
-            onSaveProduct(productData, productToEdit ? productToEdit.id : null);
+            onSaveProduct(productData);
             alert(productToEdit ? 'Product updated successfully!' : 'Product added successfully!');
             
             // Reset form if it's a new product

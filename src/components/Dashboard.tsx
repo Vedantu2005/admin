@@ -132,15 +132,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   };
 
   // --- Handlers for Regular Products ---
-  const handleSaveProduct = async (productData: Omit<Product, 'id' | 'status' | 'firestoreId'>, id: number | null) => {
+  const handleSaveProduct = async (productData: Omit<Product, 'id' | 'status' | 'firestoreId'>) => {
     setLoading(true);
     setError(null);
     try {
-      if (id && productToEdit?.firestoreId) {
+      if (productToEdit) {
         // Update existing product
-        await ProductService.updateProduct(productToEdit.firestoreId, productData);
+        await ProductService.updateProduct(productToEdit.firestoreId!, productData);
         setProducts(prev => prev.map(p => 
-          p.id === id ? { ...p, ...productData, id } : p
+          p.firestoreId === productToEdit.firestoreId ? { ...p, ...productData } : p
         ));
       } else {
         // Add new product
@@ -163,16 +163,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     }
   };
 
-  const handleDeleteProduct = async (id: number) => {
+  const handleDeleteProduct = async (firestoreId: string) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       setLoading(true);
       setError(null);
       try {
-        const product = products.find(p => p.id === id);
-        if (product?.firestoreId) {
-          await ProductService.deleteProduct(product.firestoreId);
-          setProducts(prev => prev.filter(p => p.id !== id));
-        }
+        await ProductService.deleteProduct(firestoreId);
+        setProducts(prev => prev.filter(p => p.firestoreId !== firestoreId));
       } catch (err) {
         setError('Failed to delete product');
         console.error('Error deleting product:', err);
